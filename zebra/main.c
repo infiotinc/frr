@@ -206,6 +206,7 @@ struct quagga_signal_t zebra_signals[] = {
 #ifdef ZEBRA_INFIOT_CUSTOM_NEXTHOP_CHECK
 #include "tracker_api.h"
 #include "lib/json.h"
+#include <time.h>
 
 void infnh_init(void);
 struct prefix g_infovlay_prefix;
@@ -522,7 +523,12 @@ int main(int argc, char **argv)
 	frr_config_fork();
 
 #ifdef ZEBRA_INFIOT_CUSTOM_NEXTHOP_CHECK
+	clock_t t1, t2;
+	t1 = clock();
 	infnh_init();
+	t2 = clock();
+	long ms = (t2-t1)/((CLOCKS_PER_SEC/1000000));
+	fprintf(stdout, "infnh_init exec time: %u us \n", ms);
 #endif
 
 	/* After we have successfully acquired the pidfile, we can be sure
