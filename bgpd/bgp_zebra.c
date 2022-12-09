@@ -2538,6 +2538,8 @@ void bgp_zebra_init(struct thread_master *master, unsigned short instance)
 	zclient = zclient_new_notify(master, &zclient_options_default);
 	//zclient_init(zclient, ZEBRA_ROUTE_BGP, 0, &bgpd_privs);
 
+	zclient_init_sync(zclient, ZEBRA_ROUTE_BGP, 0, &bgpd_privs);
+	zclient_num_connects++;
 	zclient->zebra_connected = bgp_zebra_connected;
 	zclient->router_id_update = bgp_router_id_update;
 	zclient->interface_add = bgp_interface_add;
@@ -2571,7 +2573,6 @@ void bgp_zebra_init(struct thread_master *master, unsigned short instance)
 	zclient->ipset_entry_notify_owner = ipset_entry_notify_owner;
 	zclient->iptable_notify_owner = iptable_notify_owner;
 	zclient->instance = instance;
-	zclient_init_sync(zclient, ZEBRA_ROUTE_BGP, 0, &bgpd_privs);
 }
 
 void bgp_zebra_destroy(void)
