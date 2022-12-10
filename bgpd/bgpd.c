@@ -7815,7 +7815,6 @@ void bgp_init(unsigned short instance)
 	/* Init zebra. */
 	bgp_zebra_init(bm->master, instance);
 
-
 #if ENABLE_BGP_VNC
 	vnc_zebra_init(bm->master);
 #endif
