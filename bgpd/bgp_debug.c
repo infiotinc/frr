@@ -2401,6 +2401,7 @@ void bgp_debug_init(void)
 	install_element(CONFIG_NODE, &debug_bgp_pbr_cmd);
 	install_element(ENABLE_NODE, &no_debug_bgp_pbr_cmd);
 	install_element(CONFIG_NODE, &no_debug_bgp_pbr_cmd);
+        DEBUG_ON(nht, NHT);
 
 }
 

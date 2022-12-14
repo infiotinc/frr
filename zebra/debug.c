@@ -29,7 +29,7 @@ unsigned long zebra_debug_packet;
 unsigned long zebra_debug_kernel;
 unsigned long zebra_debug_rib;
 unsigned long zebra_debug_fpm;
-unsigned long zebra_debug_nht;
+unsigned long zebra_debug_nht=1;
 unsigned long zebra_debug_mpls;
 unsigned long zebra_debug_vxlan;
 unsigned long zebra_debug_pw;
