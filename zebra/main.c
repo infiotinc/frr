@@ -210,7 +210,7 @@ struct quagga_signal_t zebra_signals[] = {
 void infnh_init(void);
 struct prefix g_infovlay_prefix;
 struct in_addr g_infovlay_ipv4;
-struct trkr_client *g_infovlay_trkr;
+struct trkr_client *g_infovlay_trkr = NULL;
 uint8_t g_infovlay_cfgread = 0;
 #define ZEBRA_INFIOT_CUSTOM_NEXTHOP_CFGPATH "/infgw/inf_config.json"
 
