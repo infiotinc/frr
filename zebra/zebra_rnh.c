@@ -73,6 +73,7 @@ DEFINE_HOOK(evaluate_custom_nexthop, (struct prefix *pp, uint8_t *isreachable),
 extern struct prefix g_infovlay_prefix;
 struct in_addr g_infovlay_ipv4;
 extern struct trkr_client *g_infovlay_trkr;
+int g_inf_nhcntr_read_success = 0;
 #endif
 
 static int compare_state(struct route_entry *r1, struct route_entry *r2);
@@ -541,10 +542,7 @@ static void recreate_tracker_client() {
 	 * data is inconsistent between tracker client and manager.
 	 * Recreating fixes it.
          */
-	if (IS_ZEBRA_DEBUG_NHT) 
-	{
-		zlog_debug("Infiot: recreating tracker client");
-	}   
+	zlog_debug("Infiot: recreating tracker client");
 	trkr_client_delete(g_infovlay_trkr);
 	g_infovlay_trkr = NULL;
 }
@@ -595,11 +593,17 @@ static int check_overlay_nexthop(struct prefix *pp, uint8_t *isreachable)
 	snprintf(cntrname, 256, "nh.%s", via);
 	const trkr_t *trkr = trkr_client_get_trkr(g_infovlay_trkr, cntrname, 0, 1);
 
+	if (trkr) {
+		g_inf_nhcntr_read_success = 1;
+	}
 	if ( trkr && trkr->val > 0 ) {
 		inet_ntop(pp->family, &trkr->val, via, PREFIX2STR_BUFFER);
 		snprintf(cntrname, 256, "overlay.%s", via);
 	}else{
-	       if (trkr == NULL) {
+	       if (trkr == NULL && !g_inf_nhcntr_read_success) {
+		   /* Even if one nh cntr is read successfully from SHM, there is no attempt
+		    * to recreate tracker client
+		    */
 		   recreate_tracker_client();
 		   return *isreachable;
 	       }
@@ -613,10 +617,6 @@ static int check_overlay_nexthop(struct prefix *pp, uint8_t *isreachable)
 			*isreachable = 1;
 	}
 
-	if (trkr == NULL) {
-		recreate_tracker_client();
-		return *isreachable;
-	}
 	if (IS_ZEBRA_DEBUG_NHT) 
 	{
 		zlog_debug("Infiot via: %s, cntrname %s val %lu reachable %d", via, cntrname, 
