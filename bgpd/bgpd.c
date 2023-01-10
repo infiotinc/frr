@@ -7812,6 +7812,7 @@ void bgp_init(unsigned short instance)
 	/* pre-init pthreads */
 	bgp_pthreads_init();
 
+	bgp_vty_init();
 	/* Init zebra. */
 	bgp_zebra_init(bm->master, instance);
 
@@ -7821,7 +7822,6 @@ void bgp_init(unsigned short instance)
 #endif
 
 	/* BGP VTY commands installation.  */
-	bgp_vty_init();
 
 	/* BGP inits. */
 	bgp_attr_init();
