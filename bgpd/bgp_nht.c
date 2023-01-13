@@ -704,9 +704,15 @@ static void evaluate_paths(struct bgp_nexthop_cache *bnc)
 			path->sub_type == BGP_ROUTE_IMPORTED &&
 			path->extra &&
 			path->extra->num_labels) {
+			uint32_t label = 0;
 
-			bnc_is_valid_nexthop =
+			label = decode_label(&path->extra->label[0]);
+			if (path->extra->num_labels == 1 && label == MPLS_LABEL_IMPLICIT_NULL) {
+			    bnc_is_valid_nexthop = bgp_isvalid_nexthop(bnc) ? 1 : 0;
+			} else {
+			    bnc_is_valid_nexthop =
 				bgp_isvalid_labeled_nexthop(bnc) ? 1 : 0;
+			}
 		} else {
 			bnc_is_valid_nexthop =
 				bgp_isvalid_nexthop(bnc) ? 1 : 0;
