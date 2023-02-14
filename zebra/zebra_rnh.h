@@ -55,6 +55,7 @@ typedef enum { RNH_NEXTHOP_TYPE, RNH_IMPORT_CHECK_TYPE } rnh_type_t;
 
 extern int zebra_rnh_ip_default_route;
 extern int zebra_rnh_ipv6_default_route;
+extern struct prefix g_infovlay_prefix;
 
 extern void zebra_rnh_init(void);
 

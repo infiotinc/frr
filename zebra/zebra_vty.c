@@ -55,6 +55,7 @@
 
 extern int allow_delete;
 uint8_t g_skip_rtnetlink = 0;
+int g_ovlay_pfx_set_via_cli = 0;
 
 static int do_show_ip_route(struct vty *vty, const char *vrf_name, afi_t afi,
 			    safi_t safi, bool use_fib, uint8_t use_json,
@@ -1088,6 +1089,51 @@ DEFUN (no_ipv6_nht_default_route,
 	zebra_evaluate_rnh(VRF_DEFAULT, AF_INET6, 1, RNH_NEXTHOP_TYPE, NULL);
 	return CMD_SUCCESS;
 }
+
+DEFUN (ip_nht_overlay,
+       ip_nht_overlay_cmd,
+       "ip nht overlay A.B.C.D/M",
+       IP_STR
+       "Nexthop Tracking\n"
+       "overlay Prefix\n"
+       "IP prefix <network>/<length>\n")
+{
+   int idx = 3;
+   int ret;
+   struct prefix p;
+
+   ret = str2prefix(argv[idx]->arg, &p);
+   if (ret < 0) {
+       vty_out(vty, "Malformed address\n");
+       return CMD_WARNING_CONFIG_FAILED;
+   }
+   apply_mask(&p);
+
+   prefix_copy(&g_infovlay_prefix, &p);
+   g_ovlay_pfx_set_via_cli = 1;
+
+   return CMD_SUCCESS;
+}
+
+DEFUN (show_ip_nht_overlay,
+       show_ip_nht_overlay_cmd,
+       "show ip nht overlay",
+       SHOW_STR
+       IP_STR
+       "Nexthop Tracking\n"
+       "overlay Prefix\n")
+{
+    char buf[BUFSIZ];
+
+    sprintf(buf, "%s/%d", inet_ntoa(g_infovlay_prefix.u.prefix4),
+            g_infovlay_prefix.prefixlen);
+
+    vty_out(vty, "Global Overlay Prefix is: %s\n", buf);
+
+    return CMD_SUCCESS;
+}
+
+
 
 DEFPY (show_route,
        show_route_cmd,
@@ -2388,6 +2434,11 @@ static int config_write_protocol(struct vty *vty)
 	if (zebra_rnh_ip_default_route)
 		vty_out(vty, "ip nht resolve-via-default\n");
 
+	if (g_ovlay_pfx_set_via_cli) {
+		vty_out(vty, "ip nht overlay %s/%d\n", inet_ntoa(g_infovlay_prefix.u.prefix4),
+                        g_infovlay_prefix.prefixlen);
+        }
+
 	if (zebra_rnh_ipv6_default_route)
 		vty_out(vty, "ipv6 nht resolve-via-default\n");
 
@@ -2711,6 +2762,8 @@ void zebra_vty_init(void)
 	install_element(CONFIG_NODE, &no_ip_nht_default_route_cmd);
 	install_element(CONFIG_NODE, &ipv6_nht_default_route_cmd);
 	install_element(CONFIG_NODE, &no_ipv6_nht_default_route_cmd);
+        install_element(CONFIG_NODE, &ip_nht_overlay_cmd);
+	install_element(VIEW_NODE, &show_ip_nht_overlay_cmd);
 	install_element(VIEW_NODE, &show_ipv6_mroute_cmd);
 
 	/* Commands for VRF */

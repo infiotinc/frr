@@ -70,7 +70,6 @@ DECLARE_HOOK(evaluate_custom_nexthop, (struct prefix *pp, uint8_t *isreachable),
 		(pp, isreachable));
 DEFINE_HOOK(evaluate_custom_nexthop, (struct prefix *pp, uint8_t *isreachable),
 		(pp, isreachable));
-extern struct prefix g_infovlay_prefix;
 struct in_addr g_infovlay_ipv4;
 extern struct trkr_client *g_infovlay_trkr;
 int g_inf_nhcntr_read_success = 0;
