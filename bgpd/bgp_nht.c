@@ -562,7 +562,11 @@ static int make_prefix(int afi, struct bgp_info *ri, struct prefix *p)
 static void sendmsg_zebra_rnh(struct bgp_nexthop_cache *bnc, int command)
 {
 	struct prefix *p;
+        union sockunion addr;
 	bool exact_match = false;
+        struct peer *peer;        
+        struct listnode *node, *nnode;
+        uint8_t bgp_client_info = 0;
 	int ret;
 
 	if (!zclient)
@@ -587,9 +591,21 @@ static void sendmsg_zebra_rnh(struct bgp_nexthop_cache *bnc, int command)
 			__func__, zserv_command_string(command), buf,
 			bnc->bgp->name);
 	}
+	prefix2sockunion(p, &addr);
+
+	for (ALL_LIST_ELEMENTS(bnc->bgp->peer, node, nnode, peer)) {
+		if(sockunion_same(&peer->su, &addr)) {
+			if (peer->local_as != peer->as) {
+				bgp_client_info = ZEBRA_INF_BGP_NHT_EBGP_REG;
+			} else {
+				bgp_client_info = ZEBRA_INF_BGP_NHT_IBGP_REG;
+			}
+                        break;
+		}
+	}
 
 	ret = zclient_send_rnh(zclient, command, p, exact_match,
-			       bnc->bgp->vrf_id);
+			       bnc->bgp->vrf_id, bgp_client_info);
 	/* TBD: handle the failure */
 	if (ret < 0){
 		zlog_warn("sendmsg_nexthop: zclient_send_message() failed");
