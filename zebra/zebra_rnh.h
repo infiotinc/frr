@@ -33,6 +33,8 @@ struct rnh {
 #define ZEBRA_NHT_DELETED       0x2
 #define ZEBRA_NHT_EXACT_MATCH   0x4
 
+	uint8_t client_info_flag;
+#define ZEBRA_NHT_EBGP          0x1
 	/* VRF identifier. */
 	vrf_id_t vrf_id;
 

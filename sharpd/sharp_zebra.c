@@ -223,7 +223,7 @@ void sharp_zebra_nexthop_watch(struct prefix *p, bool watch)
 	if (!watch)
 		command = ZEBRA_NEXTHOP_UNREGISTER;
 
-	zclient_send_rnh(zclient, command, p, true, VRF_DEFAULT);
+	zclient_send_rnh(zclient, command, p, true, VRF_DEFAULT, 0);
 }
 
 static int sharp_nexthop_update(int command, struct zclient *zclient,
