@@ -702,7 +702,7 @@ void zclient_init_sync(struct zclient *zclient, int redist_default,
 
 
 int zclient_send_rnh(struct zclient *zclient, int command, struct prefix *p,
-		     bool exact_match, vrf_id_t vrf_id)
+		     bool exact_match, vrf_id_t vrf_id, uint8_t client_info)
 {
 	struct stream *s;
 
@@ -713,6 +713,7 @@ int zclient_send_rnh(struct zclient *zclient, int command, struct prefix *p,
 
 	stream_putw(s, PREFIX_FAMILY(p));
 	stream_putc(s, p->prefixlen);
+	stream_putc(s, client_info);
 	switch (PREFIX_FAMILY(p)) {
 	case AF_INET:
 		stream_put_in_addr(s, &p->u.prefix4);
