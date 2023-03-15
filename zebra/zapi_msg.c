@@ -1023,6 +1023,7 @@ static void zread_rnh_register(ZAPI_HANDLER_ARGS)
 	uint8_t flags = 0;
 	uint16_t type = cmd2type[hdr->command];
 	bool exist;
+        uint8_t client_info = 0;
 
 	if (IS_ZEBRA_DEBUG_NHT)
 		zlog_debug(
@@ -1039,7 +1040,8 @@ static void zread_rnh_register(ZAPI_HANDLER_ARGS)
 		STREAM_GETC(s, flags);
 		STREAM_GETW(s, p.family);
 		STREAM_GETC(s, p.prefixlen);
-		l += 4;
+		STREAM_GETC(s, client_info);
+		l += 5;
 		if (p.family == AF_INET) {
 			if (p.prefixlen > IPV4_MAX_BITLEN) {
 				zlog_warn(
@@ -1085,6 +1087,14 @@ static void zread_rnh_register(ZAPI_HANDLER_ARGS)
 					       ZEBRA_NHT_EXACT_MATCH))
 				UNSET_FLAG(rnh->flags, ZEBRA_NHT_EXACT_MATCH);
 		}
+ 
+                switch (client_info) {
+                   case ZEBRA_INF_BGP_NHT_EBGP_REG:
+                      SET_FLAG(rnh->client_info_flag , ZEBRA_NHT_EBGP);
+                   break;
+                   default:
+                      rnh->client_info_flag = 0;
+                }
 
 		zebra_add_rnh_client(rnh, client, type, zvrf_id(zvrf));
 		/* Anything not AF_INET/INET6 has been filtered out above */

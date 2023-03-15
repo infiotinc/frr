@@ -58,6 +58,9 @@
 #define ZEBRA_IPTABLES_FORWARD 0
 #define ZEBRA_IPTABLES_DROP    1
 
+#define ZEBRA_INF_BGP_NHT_IBGP_REG 1
+#define ZEBRA_INF_BGP_NHT_EBGP_REG 2
+
 extern struct sockaddr_storage zclient_addr;
 extern socklen_t zclient_addr_len;
 
@@ -597,7 +600,7 @@ extern void zebra_read_pw_status_update(int command, struct zclient *zclient,
 extern int zclient_route_send(uint8_t, struct zclient *, struct zapi_route *);
 extern int zclient_send_rnh(struct zclient *zclient, int command,
 			    struct prefix *p, bool exact_match,
-			    vrf_id_t vrf_id);
+			    vrf_id_t vrf_id, uint8_t clientinfo);
 extern int zapi_route_encode(uint8_t, struct stream *, struct zapi_route *);
 extern int zapi_route_decode(struct stream *, struct zapi_route *);
 bool zapi_route_notify_decode(struct stream *s, struct prefix *p,
