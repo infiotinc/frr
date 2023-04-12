@@ -62,7 +62,10 @@
 #include "zebra/zebra_pbr.h"
 #include "zebra/table_manager.h"
 #include "zebra/zapi_msg.h"
+#include "zebra/zebra_fpm_private.h"
 
+DEFINE_HOOK(egress_update, (struct infiot_egress_hook * rn, const char *reason),
+	    (rn, reason))
 /* Encoding helpers -------------------------------------------------------- */
 
 static void zserv_encode_interface(struct stream *s, struct interface *ifp)
@@ -2342,6 +2345,36 @@ stream_failure:
 	return;
 }
 
+//update from BGP regarding the egress tracking
+static inline void zread_infiot_egress(ZAPI_HANDLER_ARGS)
+{
+	uint32_t size = 0;
+	uint32_t dest= 0;
+	struct stream *s;
+	s = msg;
+	STREAM_GETL(s, size);
+	STREAM_GETL(s, dest);
+	struct infiot_egress_hook* update = NULL;
+	update = (struct infiot_egress_hook*)malloc(sizeof(struct infiot_egress_hook));
+	if(!update) {
+		zlog_warn("Malloc failed");
+		return;
+	}
+	update->dest = dest;
+	update->size = size;
+	for(int i=0;i<size;i++) {
+		STREAM_GETL(s, update->nexthop[i]);
+	}
+	for(int i=0;i<size;i++) {
+		STREAM_GETW(s, update->cost[i]);
+	}
+	//Added a hook call to the FPM library to send the information
+	//to the dataplane via FPM
+	hook_call(egress_update, update,NULL);
+stream_failure:
+	return;
+}
+
 static inline void zread_iptable(ZAPI_HANDLER_ARGS)
 {
 	struct zebra_pbr_iptable zpi;
@@ -2442,6 +2475,8 @@ void (*zserv_handlers[])(ZAPI_HANDLER_ARGS) = {
 	[ZEBRA_IPSET_ENTRY_DELETE] = zread_ipset_entry,
 	[ZEBRA_IPTABLE_ADD] = zread_iptable,
 	[ZEBRA_IPTABLE_DELETE] = zread_iptable,
+	[ZEBRA_INFIOT_EGRESS_ADD] = zread_infiot_egress,
+	[ZEBRA_INFIOT_EGRESS_DELETE] = zread_infiot_egress,
 };
 
 #if defined(HANDLE_ZAPI_FUZZING)

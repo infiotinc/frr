@@ -29,6 +29,7 @@
 #include "zebra/zserv.h"
 #include "zebra/zebra_pbr.h"
 #include "zebra/zebra_errors.h"
+#include "zebra/zebra_egress.h"
 
 /*
  * This is called to process inbound ZAPI messages.
