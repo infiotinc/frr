@@ -36,6 +36,8 @@
 #define ORF_COMMON_PART_PERMIT     0x00 
 #define ORF_COMMON_PART_DENY       0x20 
 
+#define INFIOT_EXT_COMM  111
+
 /* Packet send and receive function prototypes. */
 extern void bgp_keepalive_send(struct peer *);
 extern void bgp_open_send(struct peer *);
