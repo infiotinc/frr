@@ -560,6 +560,9 @@ leak_update(
 		/* No nexthop tracking for redistributed routes */
 		if (bi_ultimate->sub_type == BGP_ROUTE_REDISTRIBUTE)
 			nh_valid = 1;
+                else if (bi_ultimate->sub_type == BGP_ROUTE_STATIC) {
+                        nh_valid = 1;
+                }
 		else
 			/*
 			 * TBD do we need to do anything about the
@@ -623,6 +626,9 @@ leak_update(
 	 */
 	if (bi_ultimate->sub_type == BGP_ROUTE_REDISTRIBUTE)
 		nh_valid = 1;
+        else if (bi_ultimate->sub_type == BGP_ROUTE_STATIC) {
+                nh_valid = 1;
+        }
 	else
 		/*
 		 * TBD do we need to do anything about the
