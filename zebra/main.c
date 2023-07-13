@@ -212,6 +212,7 @@ struct prefix g_infovlay_prefix;
 struct in_addr g_infovlay_ipv4;
 struct trkr_client *g_infovlay_trkr = NULL;
 uint8_t g_infovlay_cfgread = 0;
+int g_inf_is_controller = 0;
 #define ZEBRA_INFIOT_CUSTOM_NEXTHOP_CFGPATH "/infgw/inf_config.json"
 
 static int infnh_readcfg()
@@ -220,7 +221,7 @@ static int infnh_readcfg()
 	FILE *fp = NULL;
 	ssize_t fsize = 0;
 	char *rawdata = NULL;
-	struct json_object *jsondata = NULL, *dcfg_overlay = NULL;
+	struct json_object *jsondata = NULL, *dcfg_overlay = NULL, *dcfg_role = NULL;
 	struct json_object *json_ovlay_ipv4 = NULL, *json_ovlay_netmask = NULL;
 	struct json_object *device_config = NULL, *jsondatafull = NULL;
 
@@ -260,6 +261,19 @@ static int infnh_readcfg()
 	if (device_config) {
 		jsondata = device_config;
 	}
+
+	json_object_object_get_ex(jsondata, "dcfg_role", &dcfg_role);
+	if (dcfg_role == NULL) {
+		ok = 0;
+		fprintf(stdout, "error parsing dcfg_role\n");
+		goto error;
+	}
+	const char *role_str = json_object_get_string(dcfg_role);
+
+        fprintf(stdout, "INFIOT Role is %s\n", role_str);
+        if (strncmp(role_str, "controller", 10) == 0) {
+             g_inf_is_controller = 1;
+        } 
 
 	json_object_object_get_ex(jsondata, "dcfg_overlay", &dcfg_overlay);
 	if (dcfg_overlay == NULL) {
