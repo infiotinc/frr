@@ -73,6 +73,7 @@ DEFINE_HOOK(evaluate_custom_nexthop, (struct prefix *pp, uint8_t *isreachable),
 struct in_addr g_infovlay_ipv4;
 extern struct trkr_client *g_infovlay_trkr;
 int g_inf_nhcntr_read_success = 0;
+extern int g_inf_is_controller;
 #endif
 
 static int compare_state(struct route_entry *r1, struct route_entry *r2);
@@ -557,6 +558,14 @@ static int check_overlay_nexthop(struct prefix *pp, uint8_t *isreachable)
 	if (IS_ZEBRA_DEBUG_NHT) {
 		zlog_debug("Overlay Prefix %s", via);
 	}
+
+        if (g_inf_is_controller) {
+            if (IS_ZEBRA_DEBUG_NHT) {
+                zlog_debug("Overlay NHT Skipping for Controller");
+            }
+            *isreachable = 1;
+            return *isreachable;
+        }
 
 	if (prefix_match(&g_infovlay_prefix, pp) == 0) {
 		*isreachable = 1;
