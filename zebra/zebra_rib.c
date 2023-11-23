@@ -1490,7 +1490,7 @@ static void rib_process_update_fib(struct zebra_vrf *zvrf,
 					in_fib = true;
 					break;
 				}
-			if (!in_fib)
+			if (!in_fib || new->type == ZEBRA_ROUTE_STATIC)
 				rib_install_kernel(rn, new, NULL);
 		}
 	}
