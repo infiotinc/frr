@@ -10858,11 +10858,12 @@ static void bgp_show_all_instances_neighbors_vty(struct vty *vty,
 			bgp_show_neighbor(vty, bgp, type, NULL, NULL,
 					  use_json, json);
 		}
+		json_object_free(json);
+                json = NULL;
 	}
 
 	if (use_json) {
 		vty_out(vty, "}\n");
-		json_object_free(json);
 	}
 }
 
