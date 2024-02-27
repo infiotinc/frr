@@ -87,6 +87,8 @@
 extern const char *bgp_origin_str[];
 extern const char *bgp_origin_long_str[];
 
+int g_enable_overlay_metric_pref = 0;
+
 /* PMSI strings. */
 #define PMSI_TNLTYPE_STR_NO_INFO "No info"
 #define PMSI_TNLTYPE_STR_DEFAULT PMSI_TNLTYPE_STR_NO_INFO
@@ -1855,7 +1857,7 @@ void bgp_best_selection(struct bgp *bgp, struct bgp_node *rn,
 
 	debug = bgp_debug_bestpath(&rn->p);
 
-	if (debug)
+        if (debug)
 		prefix2str(&rn->p, pfx_buf, sizeof(pfx_buf));
 
 	/* bgp deterministic-med */
@@ -1979,6 +1981,11 @@ void bgp_best_selection(struct bgp *bgp, struct bgp_node *rn,
 				 debug, pfx_buf, afi, safi)) {
 			new_select = ri;
 		}
+                if (g_enable_overlay_metric_pref && ri->nexthop->overlay_path_cost &&  new_select->nexthop->overlay_path_cost) {
+                	if (ri->nexthop->overlay_path_cost < new_select->nexthop->overlay_path_cost) {
+                		new_select = ri;
+                	}
+                }
 	}
 
 	/* Now that we know which path is the bestpath see if any of the other
