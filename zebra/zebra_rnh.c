@@ -65,11 +65,11 @@ static void copy_state(struct rnh *rnh, struct route_entry *re,
 
 #define ZEBRA_INFIOT_CUSTOM_NEXTHOP_CHECK
 #ifdef ZEBRA_INFIOT_CUSTOM_NEXTHOP_CHECK
-static int check_overlay_nexthop(struct prefix *pp, uint8_t *isreachable);
-DECLARE_HOOK(evaluate_custom_nexthop, (struct prefix *pp, uint8_t *isreachable),
-		(pp, isreachable));
-DEFINE_HOOK(evaluate_custom_nexthop, (struct prefix *pp, uint8_t *isreachable),
-		(pp, isreachable));
+static int check_overlay_nexthop(struct prefix *pp, uint8_t *isreachable, uint32_t *overlay_metric);
+DECLARE_HOOK(evaluate_custom_nexthop, (struct prefix *pp, uint8_t *isreachable, uint32_t *overlay_metric),
+		(pp, isreachable, overlay_metric));
+DEFINE_HOOK(evaluate_custom_nexthop, (struct prefix *pp, uint8_t *isreachable, uint32_t *overlay_metric),
+		(pp, isreachable, overlay_metric));
 struct in_addr g_infovlay_ipv4;
 extern struct trkr_client *g_infovlay_trkr;
 int g_inf_nhcntr_read_success = 0;
@@ -535,6 +535,8 @@ static void zebra_rnh_process_pbr_tables(int family,
 }
 
 #ifdef ZEBRA_INFIOT_CUSTOM_NEXTHOP_CHECK
+#define ZEBRA_INFIOT_OVERLAY_PATH_PEER 1
+#define ZEBRA_INFIOT_OVERLAY_PATH_TRANSIT 2
 #include "tracker_api.h"
 
 static void recreate_tracker_client() {
@@ -547,9 +549,11 @@ static void recreate_tracker_client() {
 	g_infovlay_trkr = NULL;
 }
 
-static int check_overlay_nexthop(struct prefix *pp, uint8_t *isreachable)
+
+static int check_overlay_nexthop(struct prefix *pp, uint8_t *isreachable, uint32_t *overlay_metric)
 {
 	char via[PREFIX2STR_BUFFER], selfip[PREFIX2STR_BUFFER];
+        char nh[PREFIX2STR_BUFFER];
 	char cntrname[256 + 1];
 
 	*isreachable = 0;
@@ -597,8 +601,8 @@ static int check_overlay_nexthop(struct prefix *pp, uint8_t *isreachable)
 	}
 
 	//get the nextop to check if it is connected. 
-	inet_ntop(pp->family, &pp->u.prefix, via, PREFIX2STR_BUFFER);
-	snprintf(cntrname, 256, "nh.%s", via);
+	inet_ntop(pp->family, &pp->u.prefix, nh, PREFIX2STR_BUFFER);
+	snprintf(cntrname, 256, "nh.%s", nh);
 	const trkr_t *trkr = trkr_client_get_trkr(g_infovlay_trkr, cntrname, 0, 1);
 
 	if (trkr) {
@@ -607,6 +611,16 @@ static int check_overlay_nexthop(struct prefix *pp, uint8_t *isreachable)
 	if ( trkr && trkr->val > 0 ) {
 		inet_ntop(pp->family, &trkr->val, via, PREFIX2STR_BUFFER);
 		snprintf(cntrname, 256, "overlay.%s", via);
+                /* Temporarily setting overlay_path_metric as below, works
+                 * for testing and hub specific cases. For all cases, click
+                 * should update the metric as a counter for each overlay 
+                 * destination.
+                 */
+                if (strncmp(via, nh, PREFIX2STR_BUFFER) == 0) {
+                    *overlay_metric = ZEBRA_INFIOT_OVERLAY_PATH_PEER;
+                } else {
+ 		    *overlay_metric = ZEBRA_INFIOT_OVERLAY_PATH_TRANSIT;
+                }
 	}else{
 	       if (trkr == NULL && !g_inf_nhcntr_read_success) {
 		   /* Even if one nh cntr is read successfully from SHM, there is no attempt
@@ -617,7 +631,7 @@ static int check_overlay_nexthop(struct prefix *pp, uint8_t *isreachable)
 	       }
 	       inet_ntop(pp->family, &pp->u.prefix, via, PREFIX2STR_BUFFER);
                snprintf(cntrname, 256, "overlay.%s", via);
-
+	       *overlay_metric = ZEBRA_INFIOT_OVERLAY_PATH_PEER;
 	}
 
 	trkr = trkr_client_get_trkr(g_infovlay_trkr, cntrname, 0, 1);
@@ -664,6 +678,7 @@ zebra_rnh_resolve_nexthop_entry(vrf_id_t vrfid, int family,
 	struct route_node *rn;
 	struct route_entry *re;
 	*prn = NULL;
+        uint32_t overlay_path_metric = 0;
 
 	route_table = zebra_vrf_table(family2afi(family), SAFI_UNICAST, vrfid);
 	if (!route_table)
@@ -701,7 +716,7 @@ zebra_rnh_resolve_nexthop_entry(vrf_id_t vrfid, int family,
 					vrfid, bufn, re, rn, re->status, re->flags, re->type, rnh->flags);
 			}
 			if (!CHECK_FLAG(rnh->client_info_flag , ZEBRA_NHT_EBGP)) {
-				hook_call(evaluate_custom_nexthop, &nrn->p, &isreachable);
+				hook_call(evaluate_custom_nexthop, &nrn->p, &isreachable, &overlay_path_metric);
 				if (isreachable) {
 					break;
 				}else if (prefix_match(&g_infovlay_prefix, &rn->p)){
@@ -744,6 +759,7 @@ zebra_rnh_resolve_nexthop_entry(vrf_id_t vrfid, int family,
 		/* Route entry found, we're done; else, walk up the tree. */
 		if (re) {
 			*prn = rn;
+                        rnh->overlay_path_cost = overlay_path_metric; 
 			return re;
 		}
 
@@ -1045,6 +1061,7 @@ static int send_client(struct rnh *rnh, struct zserv *client, rnh_type_t type,
 		stream_putw(s, re->instance);
 		stream_putc(s, re->distance);
 		stream_putl(s, re->metric);
+		stream_putl(s, rnh->overlay_path_cost);
 		num = 0;
 		nump = stream_get_endp(s);
 		stream_putc(s, 0);
@@ -1090,6 +1107,7 @@ static int send_client(struct rnh *rnh, struct zserv *client, rnh_type_t type,
 		stream_putw(s, 0); // instance
 		stream_putc(s, 0); // distance
 		stream_putl(s, 0); // metric
+		stream_putl(s, 0); // overlay path metric
 		stream_putc(s, 0); // nexthops
 	}
 	stream_putw_at(s, 0, stream_get_endp(s));

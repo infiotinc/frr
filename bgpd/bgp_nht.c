@@ -389,9 +389,9 @@ void bgp_parse_nexthop_update(int command, vrf_id_t vrf_id)
 		char buf[PREFIX2STR_BUFFER];
 		prefix2str(&nhr.prefix, buf, sizeof(buf));
 		zlog_debug(
-			"%u: Rcvd NH update %s - metric %d/%d #nhops %d/%d flags 0x%x",
+			"%u: Rcvd NH update %s - metric %d/%d #nhops %d/%d flags 0x%x, overlay_cost %d/%d",
 			vrf_id, buf, nhr.metric, bnc->metric, nhr.nexthop_num,
-			bnc->nexthop_num, bnc->flags);
+			bnc->nexthop_num, bnc->flags, nhr.overlay_path_cost, bnc->overlay_path_cost);
 	}
 
 	if (nhr.metric != bnc->metric)
@@ -408,6 +408,7 @@ void bgp_parse_nexthop_update(int command, vrf_id_t vrf_id)
 		bnc->flags |= BGP_NEXTHOP_VALID;
 		bnc->metric = nhr.metric;
 		bnc->nexthop_num = nhr.nexthop_num;
+                bnc->overlay_path_cost = nhr.overlay_path_cost;
 
 		bnc->flags &= ~BGP_NEXTHOP_LABELED_VALID; /* check below */
 
@@ -460,6 +461,7 @@ void bgp_parse_nexthop_update(int command, vrf_id_t vrf_id)
 	} else {
 		bnc->flags &= ~BGP_NEXTHOP_VALID;
 		bnc->nexthop_num = nhr.nexthop_num;
+                bnc->overlay_path_cost = nhr.overlay_path_cost;
 
 		/* notify bgp fsm if nbr ip goes from valid->invalid */
 		UNSET_FLAG(bnc->flags, BGP_NEXTHOP_PEER_NOTIFIED);

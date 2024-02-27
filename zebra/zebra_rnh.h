@@ -51,6 +51,7 @@ struct rnh {
 	 * if this has been filtered for the client
 	 */
 	int filtered[ZEBRA_ROUTE_MAX];
+        uint32_t overlay_path_cost;
 };
 
 typedef enum { RNH_NEXTHOP_TYPE, RNH_IMPORT_CHECK_TYPE } rnh_type_t;
