@@ -535,20 +535,6 @@ static void zebra_rnh_process_pbr_tables(int family,
 
 #ifdef ZEBRA_INFIOT_CUSTOM_NEXTHOP_CHECK
 #include "tracker_api.h"
-
-static void recreate_tracker_client() {
-	/* trkr should not be NULL, certainly a race condition where
-	 * data is inconsistent between tracker client and manager.
-	 * Recreating fixes it.
-         */
-	if (IS_ZEBRA_DEBUG_NHT) 
-	{
-		zlog_debug("Infiot: recreating tracker client");
-	}   
-	trkr_client_delete(g_infovlay_trkr);
-	g_infovlay_trkr = NULL;
-}
-
 static int check_overlay_nexthop(struct prefix *pp, uint8_t *isreachable)
 {
 	char via[PREFIX2STR_BUFFER], selfip[PREFIX2STR_BUFFER];
@@ -607,13 +593,8 @@ static int check_overlay_nexthop(struct prefix *pp, uint8_t *isreachable)
 		inet_ntop(pp->family, &trkr->val, via, PREFIX2STR_BUFFER);
 		snprintf(cntrname, 256, "overlay.%s", via);
 	}else{
-	       if (trkr == NULL) {
-		   recreate_tracker_client();
-		   return *isreachable;
-	       }
-	       inet_ntop(pp->family, &pp->u.prefix, via, PREFIX2STR_BUFFER);
-               snprintf(cntrname, 256, "overlay.%s", via);
-
+		inet_ntop(pp->family, &pp->u.prefix, via, PREFIX2STR_BUFFER);
+		snprintf(cntrname, 256, "overlay.%s", via);
 	}
 
 	trkr = trkr_client_get_trkr(g_infovlay_trkr, cntrname, 0, 1);
@@ -621,10 +602,6 @@ static int check_overlay_nexthop(struct prefix *pp, uint8_t *isreachable)
 			*isreachable = 1;
 	}
 
-	if (trkr == NULL) {
-		recreate_tracker_client();
-		return *isreachable;
-	}
 	if (IS_ZEBRA_DEBUG_NHT) 
 	{
 		zlog_debug("Infiot via: %s, cntrname %s val %lu reachable %d", via, cntrname, 
