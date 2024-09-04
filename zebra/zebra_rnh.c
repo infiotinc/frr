@@ -745,12 +745,13 @@ zebra_rnh_resolve_nexthop_entry(vrf_id_t vrfid, int family,
 		if (re) {
 			*prn = rn;
 			return re;
+		} else {
+			/* Resolve the nexthop recursively by finding matching
+			 * route with lower prefix length
+			 */
+			rn = rn->parent;
 		}
 
-		if (CHECK_FLAG(rnh->flags, ZEBRA_NHT_CONNECTED))
-			rn = rn->parent;
-		else
-			return NULL;
 	}
 
 	return NULL;
