@@ -51,6 +51,10 @@ struct rnh {
 	 * if this has been filtered for the client
 	 */
 	int filtered[ZEBRA_ROUTE_MAX];
+#ifdef ZEBRA_INFIOT_CUSTOM_NEXTHOP_CHECK
+        int dest_trkr_index;
+        int nh_trkr_index;
+#endif
 };
 
 typedef enum { RNH_NEXTHOP_TYPE, RNH_IMPORT_CHECK_TYPE } rnh_type_t;
