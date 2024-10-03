@@ -65,11 +65,11 @@ static void copy_state(struct rnh *rnh, struct route_entry *re,
 
 #define ZEBRA_INFIOT_CUSTOM_NEXTHOP_CHECK
 #ifdef ZEBRA_INFIOT_CUSTOM_NEXTHOP_CHECK
-static int check_overlay_nexthop(struct prefix *pp, uint8_t *isreachable);
-DECLARE_HOOK(evaluate_custom_nexthop, (struct prefix *pp, uint8_t *isreachable),
-		(pp, isreachable));
-DEFINE_HOOK(evaluate_custom_nexthop, (struct prefix *pp, uint8_t *isreachable),
-		(pp, isreachable));
+static int check_overlay_nexthop(struct prefix *pp, uint8_t *isreachable, struct rnh *rnh);
+DECLARE_HOOK(evaluate_custom_nexthop, (struct prefix *pp, uint8_t *isreachable, struct rnh *rnh),
+		(pp, isreachable, rnh));
+DEFINE_HOOK(evaluate_custom_nexthop, (struct prefix *pp, uint8_t *isreachable, struct rnh *rnh),
+		(pp, isreachable, rnh));
 struct in_addr g_infovlay_ipv4;
 extern struct trkr_client *g_infovlay_trkr;
 int g_inf_nhcntr_read_success = 0;
@@ -156,6 +156,10 @@ struct rnh *zebra_add_rnh(struct prefix *p, vrf_id_t vrfid, rnh_type_t type,
 		rn->info = rnh;
 		rnh->node = rn;
 		*exists = false;
+#ifdef ZEBRA_INFIOT_CUSTOM_NEXTHOP_CHECK
+                rnh->dest_trkr_index = -1;
+                rnh->nh_trkr_index = -1;
+#endif
 	} else
 		*exists = true;
 
@@ -547,7 +551,7 @@ static void recreate_tracker_client() {
 	g_infovlay_trkr = NULL;
 }
 
-static int check_overlay_nexthop(struct prefix *pp, uint8_t *isreachable)
+static int check_overlay_nexthop(struct prefix *pp, uint8_t *isreachable, struct rnh *rnh)
 {
 	char via[PREFIX2STR_BUFFER], selfip[PREFIX2STR_BUFFER];
 	char cntrname[256 + 1];
@@ -599,7 +603,7 @@ static int check_overlay_nexthop(struct prefix *pp, uint8_t *isreachable)
 	//get the nextop to check if it is connected. 
 	inet_ntop(pp->family, &pp->u.prefix, via, PREFIX2STR_BUFFER);
 	snprintf(cntrname, 256, "nh.%s", via);
-	const trkr_t *trkr = trkr_client_get_trkr(g_infovlay_trkr, cntrname, 0, 1);
+	const trkr_t *trkr = trkr_client_get_trkr_by_index(g_infovlay_trkr, cntrname, 0, 1, &rnh->nh_trkr_index);
 
 	if (trkr) {
 		g_inf_nhcntr_read_success = 1;
@@ -620,15 +624,15 @@ static int check_overlay_nexthop(struct prefix *pp, uint8_t *isreachable)
 
 	}
 
-	trkr = trkr_client_get_trkr(g_infovlay_trkr, cntrname, 0, 1);
+	trkr = trkr_client_get_trkr_by_index(g_infovlay_trkr, cntrname, 0, 1, &rnh->dest_trkr_index);
 	if ( trkr && trkr->val > 0 ) {
 			*isreachable = 1;
 	}
 
 	if (IS_ZEBRA_DEBUG_NHT) 
 	{
-		zlog_debug("Infiot via: %s, cntrname %s val %lu reachable %d", via, cntrname, 
-			trkr == NULL ? 1 : trkr->val, *isreachable);
+		zlog_debug("Infiot via: %s, cntrname %s val %lu reachable %d nhindex %d destindex %d", via, cntrname,
+			trkr == NULL ? 1 : trkr->val, *isreachable, rnh->nh_trkr_index, rnh->dest_trkr_index);
 	}
 	return *isreachable;
 
@@ -701,7 +705,7 @@ zebra_rnh_resolve_nexthop_entry(vrf_id_t vrfid, int family,
 					vrfid, bufn, re, rn, re->status, re->flags, re->type, rnh->flags);
 			}
 			if (!CHECK_FLAG(rnh->client_info_flag , ZEBRA_NHT_EBGP)) {
-				hook_call(evaluate_custom_nexthop, &nrn->p, &isreachable);
+				hook_call(evaluate_custom_nexthop, &nrn->p, &isreachable, rnh);
 				if (isreachable) {
 					break;
 				}else if (prefix_match(&g_infovlay_prefix, &rn->p)){
