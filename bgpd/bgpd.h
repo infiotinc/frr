@@ -901,6 +901,7 @@ struct peer {
 #define PEER_FLAG_PASSWORD                  (1 << 20) /* password */
 #define PEER_FLAG_LOCAL_AS                  (1 << 21) /* local-as */
 #define PEER_FLAG_UPDATE_SOURCE             (1 << 22) /* update-source */
+#define PEER_FLAG_TCP_USER_TIMEOUT          (1 << 23) /* tcp user timeout */
 
 	/* outgoing message sent in CEASE_ADMIN_SHUTDOWN notify */
 	char *tx_shutdown_message;
@@ -979,6 +980,7 @@ struct peer {
 	_Atomic uint32_t keepalive;
 	_Atomic uint32_t connect;
 	_Atomic uint32_t routeadv;
+	_Atomic uint32_t tcpusrto;
 
 	/* Timer values. */
 	_Atomic uint32_t v_start;
@@ -1624,6 +1626,8 @@ extern int peer_timers_set(struct peer *, uint32_t keepalive,
 			   uint32_t holdtime);
 extern int peer_timers_unset(struct peer *);
 
+extern int peer_tcp_user_timeout_set(struct peer *peer, uint32_t timeout_ms);
+extern int peer_tcp_user_timeout_unset(struct peer *peer);
 extern int peer_timers_connect_set(struct peer *, uint32_t);
 extern int peer_timers_connect_unset(struct peer *);
 
