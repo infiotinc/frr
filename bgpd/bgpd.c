@@ -1206,6 +1206,7 @@ void peer_xfer_config(struct peer *peer_dst, struct peer *peer_src)
 	peer_dst->v_keepalive = peer_src->v_keepalive;
 	peer_dst->routeadv = peer_src->routeadv;
 	peer_dst->v_routeadv = peer_src->v_routeadv;
+        peer_dst->tcpusrto = peer_src->tcpusrto;
 
 	/* password apply */
 	if (peer_src->password && !peer_dst->password)
@@ -4827,6 +4828,49 @@ int peer_timers_unset(struct peer *peer)
 	return 0;
 }
 
+int peer_tcp_user_timeout_set(struct peer *peer, uint32_t timeout_ms)
+{
+    struct peer *member;
+    struct listnode *node, *nnode;
+
+    if (timeout_ms > (65535 * 1000))
+        return BGP_ERR_INVALID_VALUE;
+
+    SET_FLAG(peer->flags, PEER_FLAG_TCP_USER_TIMEOUT);
+    atomic_store(&peer->tcpusrto, timeout_ms);
+
+    if (!CHECK_FLAG(peer->sflags, PEER_STATUS_GROUP))
+        return 0;
+
+    for (ALL_LIST_ELEMENTS(peer->group->peer, node, nnode, member)) {
+
+        SET_FLAG(member->flags, PEER_FLAG_TCP_USER_TIMEOUT);
+        PEER_ATTR_INHERIT(member, peer->group, tcpusrto);
+    }
+
+    return 0;
+}
+
+int peer_tcp_user_timeout_unset(struct peer *peer)
+{
+    struct peer *member;
+    struct listnode *node, *nnode;
+
+    UNSET_FLAG(peer->flags, PEER_FLAG_TCP_USER_TIMEOUT);
+    atomic_store(&peer->tcpusrto, 0);
+
+    if (!CHECK_FLAG(peer->sflags, PEER_STATUS_GROUP))
+        return 0;
+
+    for (ALL_LIST_ELEMENTS(peer->group->peer, node, nnode, member)) {
+
+        UNSET_FLAG(member->flags, PEER_FLAG_TCP_USER_TIMEOUT);
+        atomic_store(&member->tcpusrto, 0);
+    }
+
+    return 0;
+}
+
 int peer_timers_connect_set(struct peer *peer, uint32_t connect)
 {
 	struct peer *member;
@@ -6943,6 +6987,9 @@ static void bgp_config_write_peer_global(struct vty *vty, struct bgp *bgp,
 		vty_out(vty, " neighbor %s timers %u %u\n", addr,
 			peer->keepalive, peer->holdtime);
 
+	if (peergroup_flag_check(peer, PEER_FLAG_TCP_USER_TIMEOUT))
+		vty_out(vty, " neighbor %s tcp-user-timeout %u \n", addr,
+			peer->tcpusrto);
 	/* timers connect */
 	if (peergroup_flag_check(peer, PEER_FLAG_TIMER_CONNECT))
 		vty_out(vty, " neighbor %s timers connect %u\n", addr,
