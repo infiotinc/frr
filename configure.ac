@@ -5,9 +5,9 @@
 ##  Copyright (c) 1996, 97, 98, 99, 2000 Kunihiro Ishiguro <kunihiro@zebra.org>
 ##  Portions Copyright (c) 2003 Paul Jakma <paul@dishone.st>
 ##
-AC_PREREQ(2.60)
+AC_PREREQ([2.71])
 
-AC_INIT(frr, 6.0.3, [https://github.com/frrouting/frr/issues])
+AC_INIT([frr],[6.0.3],[https://github.com/frrouting/frr/issues])
 PACKAGE_URL="https://frrouting.org/"
 AC_SUBST(PACKAGE_URL)
 PACKAGE_FULLNAME="FRRouting"
@@ -117,7 +117,6 @@ AC_PROG_CPP
 AM_PROG_CC_C_O
 dnl remove autoconf default "-g -O2"
 CFLAGS="$orig_cflags"
-AC_PROG_CC_C99
 dnl NB: see C11 below
 
 AC_PROG_EGREP
@@ -182,7 +181,6 @@ dnl ICC won't bail on unknown options without -diag-error 10006
 dnl need to do this first so we get useful results for the other options
 AC_C_FLAG([-diag-error 10006])
 
-dnl AC_PROG_CC_C99 may change CC to include -std=gnu99 or something
 ac_cc="$CC"
 CC="${CC% -std=gnu99}"
 CC="${CC% -std=c99}"
@@ -294,7 +292,7 @@ AC_CHECK_TOOL(AR, ar)
 dnl -----------------
 dnl System extensions
 dnl -----------------
-AC_GNU_SOURCE
+AC_USE_SYSTEM_EXTENSIONS
 
 dnl -------
 dnl libtool
@@ -794,7 +792,15 @@ dnl ------------------------------------
 AC_C_CONST
 AC_C_INLINE
 AC_C_VOLATILE
-AC_HEADER_STDC
+m4_warn([obsolete],
+[The preprocessor macro `STDC_HEADERS' is obsolete.
+  Except in unusual embedded environments, you can safely include all
+  ISO C90 headers unconditionally.])dnl
+# Autoupdate added the next two lines to ensure that your configure
+# script's behavior did not change.  They are probably safe to remove.
+AC_CHECK_INCLUDES_DEFAULT
+AC_PROG_EGREP
+
 dnl AC_TYPE_PID_T
 AC_TYPE_UID_T
 AC_TYPE_MODE_T
@@ -1151,7 +1157,7 @@ AC_SUBST(LIBPAM)
 dnl -------------------------------
 dnl Endian-ness check
 dnl -------------------------------
-AC_WORDS_BIGENDIAN
+AC_C_BIGENDIAN
 
 dnl -------------------------------
 dnl check the size in byte of the C
@@ -1282,23 +1288,20 @@ FRR_INCLUDES
 ])dnl
 
 AC_MSG_CHECKING([for BSD struct ip_mreq hack])
-AC_TRY_COMPILE([#include <sys/param.h>],
-[#if (defined(__FreeBSD__) && ((__FreeBSD_version >= 500022 && __FreeBSD_version < 700000) || (__FreeBSD_version < 500000 && __FreeBSD_version >= 440000))) || (defined(__NetBSD__) && defined(__NetBSD_Version__) && __NetBSD_Version__ >= 106010000) || defined(__OpenBSD__) || defined(__APPLE__) || defined(__DragonFly__) || defined(__sun)
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <sys/param.h>]], [[#if (defined(__FreeBSD__) && ((__FreeBSD_version >= 500022 && __FreeBSD_version < 700000) || (__FreeBSD_version < 500000 && __FreeBSD_version >= 440000))) || (defined(__NetBSD__) && defined(__NetBSD_Version__) && __NetBSD_Version__ >= 106010000) || defined(__OpenBSD__) || defined(__APPLE__) || defined(__DragonFly__) || defined(__sun)
   return (0);
 #else
   #error No support for BSD struct ip_mreq hack detected
-#endif],[AC_MSG_RESULT(yes)
-AC_DEFINE(HAVE_BSD_STRUCT_IP_MREQ_HACK,,[Can pass ifindex in struct ip_mreq])],
-AC_MSG_RESULT(no))
+#endif]])],[AC_MSG_RESULT(yes)
+AC_DEFINE(HAVE_BSD_STRUCT_IP_MREQ_HACK,,[Can pass ifindex in struct ip_mreq])],[AC_MSG_RESULT(no)])
 
 AC_MSG_CHECKING([for RFC3678 protocol-independed API])
-AC_TRY_COMPILE([
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
 #include <sys/types.h>
 #include <netinet/in.h>
-], [struct group_req gr; int sock; setsockopt(sock, IPPROTO_IP, MCAST_JOIN_GROUP, (void*)&gr, sizeof(gr));
-], [AC_MSG_RESULT(yes)
-AC_DEFINE(HAVE_RFC3678,1,[Have RFC3678 protocol-independed API])],
-AC_MSG_RESULT(no))
+]], [[struct group_req gr; int sock; setsockopt(sock, IPPROTO_IP, MCAST_JOIN_GROUP, (void*)&gr, sizeof(gr));
+]])],[AC_MSG_RESULT(yes)
+AC_DEFINE(HAVE_RFC3678,1,[Have RFC3678 protocol-independed API])],[AC_MSG_RESULT(no)])
 
 dnl ---------------------------------------------------------------
 dnl figure out how to check link-state
@@ -1652,12 +1655,12 @@ dnl -----------------------
 dnl checking for IP_PKTINFO
 dnl -----------------------
 AC_MSG_CHECKING(for IP_PKTINFO)
-AC_TRY_COMPILE([#include <netdb.h>], [
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <netdb.h>]], [[
   int opt = IP_PKTINFO;
-], [
+]])],[
   AC_MSG_RESULT(yes)
   AC_DEFINE(HAVE_IP_PKTINFO, 1, [Have IP_PKTINFO])
-], [
+],[
   AC_MSG_RESULT(no)
 ])
 
@@ -1665,12 +1668,12 @@ dnl ---------------------------
 dnl checking for IP_RECVDSTADDR
 dnl ---------------------------
 AC_MSG_CHECKING(for IP_RECVDSTADDR)
-AC_TRY_COMPILE([#include <netinet/in.h>], [
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <netinet/in.h>]], [[
   int opt = IP_RECVDSTADDR;
-], [
+]])],[
   AC_MSG_RESULT(yes)
   AC_DEFINE(HAVE_IP_RECVDSTADDR, 1, [Have IP_RECVDSTADDR])
-], [
+],[
   AC_MSG_RESULT(no)
 ])
 
@@ -1678,12 +1681,12 @@ dnl ----------------------
 dnl checking for IP_RECVIF
 dnl ----------------------
 AC_MSG_CHECKING(for IP_RECVIF)
-AC_TRY_COMPILE([#include <netinet/in.h>], [
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <netinet/in.h>]], [[
   int opt = IP_RECVIF;
-], [
+]])],[
   AC_MSG_RESULT(yes)
   AC_DEFINE(HAVE_IP_RECVIF, 1, [Have IP_RECVIF])
-], [
+],[
   AC_MSG_RESULT(no)
 ])
 
@@ -1691,12 +1694,12 @@ dnl ----------------------
 dnl checking for SO_BINDANY
 dnl ----------------------
 AC_MSG_CHECKING(for SO_BINDANY)
-AC_TRY_COMPILE([#include <sys/socket.h>], [
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <sys/socket.h>]], [[
   int opt = SO_BINDANY;
-], [
+]])],[
   AC_MSG_RESULT(yes)
   AC_DEFINE(HAVE_SO_BINDANY, 1, [Have SO_BINDANY])
-], [
+],[
   AC_MSG_RESULT(no)
 ])
 
@@ -1704,12 +1707,12 @@ dnl ----------------------
 dnl checking for IP_FREEBIND
 dnl ----------------------
 AC_MSG_CHECKING(for IP_FREEBIND)
-AC_TRY_COMPILE([#include <netinet/in.h>], [
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <netinet/in.h>]], [[
   int opt = IP_FREEBIND;
-], [
+]])],[
   AC_MSG_RESULT(yes)
   AC_DEFINE(HAVE_IP_FREEBIND, 1, [Have IP_FREEBIND])
-], [
+],[
   AC_MSG_RESULT(no)
 ])
 
@@ -1795,12 +1798,10 @@ dnl capabilities checks
 dnl -------------------
 if test "${enable_capabilities}" != "no"; then
   AC_MSG_CHECKING(whether prctl PR_SET_KEEPCAPS is available)
-  AC_TRY_COMPILE([#include <sys/prctl.h>],[prctl(PR_SET_KEEPCAPS, 1, 0, 0, 0);],
-    [AC_MSG_RESULT(yes)
+  AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <sys/prctl.h>]], [[prctl(PR_SET_KEEPCAPS, 1, 0, 0, 0);]])],[AC_MSG_RESULT(yes)
      AC_DEFINE(HAVE_PR_SET_KEEPCAPS,,prctl)
-     frr_ac_keepcaps="yes"],
-     AC_MSG_RESULT(no)
-  )
+     frr_ac_keepcaps="yes"],[AC_MSG_RESULT(no)
+  ])
   if test x"${frr_ac_keepcaps}" = x"yes"; then
     AC_CHECK_HEADERS(sys/capability.h)
   fi
@@ -1813,12 +1814,10 @@ if test "${enable_capabilities}" != "no"; then
   else
     AC_CHECK_HEADERS(priv.h,
      [AC_MSG_CHECKING(Solaris style privileges are available)
-      AC_TRY_COMPILE([#include <priv.h>],[getpflags(PRIV_AWARE);],
-    	  [AC_MSG_RESULT(yes)
+      AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <priv.h>]], [[getpflags(PRIV_AWARE);]])],[AC_MSG_RESULT(yes)
     	   AC_DEFINE(HAVE_SOLARIS_CAPABILITIES,1,getpflags)
-    	   frr_ac_scaps="yes"],
-    	   AC_MSG_RESULT(no)
-      )
+    	   frr_ac_scaps="yes"],[AC_MSG_RESULT(no)
+      ])
      ]
    )
   fi
