@@ -230,7 +230,7 @@ enum pim_rpf_result pim_rpf_update(struct pim_instance *pim,
 
 	if ((up->sg.src.s_addr == INADDR_ANY && I_am_RP(pim, up->sg.grp)) ||
 	    PIM_UPSTREAM_FLAG_TEST_FHR(up->flags))
-		neigh_needed = FALSE;
+		neigh_needed = false;
 	if (pim_find_or_track_nexthop(pim, &nht_p, up, NULL, &pnc)) {
 		if (pnc.nexthop_num) {
 			if (!pim_ecmp_nexthop_search(pim, &pnc,

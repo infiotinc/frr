@@ -2715,7 +2715,7 @@ void bgp_send_infiot_egress(struct egress_data info, int size) {
 	s = zclient->obuf;
 	stream_reset(s);
 	zclient_create_header(s,
-			      TRUE ? ZEBRA_INFIOT_EGRESS_ADD :
+			      true ? ZEBRA_INFIOT_EGRESS_ADD :
 			      ZEBRA_INFIOT_EGRESS_DELETE,
 			      VRF_DEFAULT);
 	stream_putl(s, size);

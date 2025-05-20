@@ -1,0 +1,7 @@
+{
+    "files.associations": {
+        "bgp_labelpool.h": "c",
+        "bgpd.h": "c",
+        "bgp_debug.h": "c"
+    }
+}
