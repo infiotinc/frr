@@ -61,7 +61,7 @@ struct label_manager {
 	struct list *lc_list;
 };
 
-bool lm_is_external;
+extern bool lm_is_external;
 
 int zread_relay_label_manager_request(int cmd, struct zserv *zserv,
 				      struct stream *msg, vrf_id_t vrf_id);

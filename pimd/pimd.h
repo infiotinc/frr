@@ -127,18 +127,18 @@
 #define PIM_IFACE_NOT_FOUND       -9
 #define PIM_UPDATE_SOURCE_DUP     -10
 
-const char *const PIM_ALL_SYSTEMS;
-const char *const PIM_ALL_ROUTERS;
-const char *const PIM_ALL_PIM_ROUTERS;
-const char *const PIM_ALL_IGMP_ROUTERS;
+extern const char *const PIM_ALL_SYSTEMS;
+extern const char *const PIM_ALL_ROUTERS;
+extern const char *const PIM_ALL_PIM_ROUTERS;
+extern const char *const PIM_ALL_IGMP_ROUTERS;
 
 extern struct thread_master *master;
 extern struct zebra_privs_t pimd_privs;
-uint32_t qpim_debugs;
-struct in_addr qpim_all_pim_routers_addr;
-int qpim_t_periodic; /* Period between Join/Prune Messages */
-struct pim_assert_metric qpim_infinite_assert_metric;
-long qpim_rpf_cache_refresh_delay_msec;
+extern uint32_t qpim_debugs;
+extern struct in_addr qpim_all_pim_routers_addr; 
+extern int qpim_t_periodic; /* Period between Join/Prune Messages */
+extern struct pim_assert_metric qpim_infinite_assert_metric;
+extern long qpim_rpf_cache_refresh_delay_msec;
 extern int qpim_packet_process;
 extern uint8_t qpim_ecmp_enable;
 extern uint8_t qpim_ecmp_rebalance_enable;
