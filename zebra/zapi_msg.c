@@ -1092,7 +1092,10 @@ static void zread_rnh_register(ZAPI_HANDLER_ARGS)
 		}
  
                 switch (client_info) {
+	           char buf[INET_ADDRSTRLEN];
                    case ZEBRA_INF_BGP_NHT_EBGP_REG:
+                      inet_ntop(AF_INET, &p.u.prefix4, buf, sizeof(buf));
+                      fprintf(stdout, "SIVA ZEBRA_NHT_EBGP: Received IPv4 irefix %s/%d", buf, p.prefixlen);
                       SET_FLAG(rnh->client_info_flag , ZEBRA_NHT_EBGP);
                    break;
                    default:

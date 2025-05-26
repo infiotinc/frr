@@ -70,7 +70,7 @@ DECLARE_HOOK(evaluate_custom_nexthop, (struct prefix *pp, uint8_t *isreachable, 
 		(pp, isreachable, rnh));
 DEFINE_HOOK(evaluate_custom_nexthop, (struct prefix *pp, uint8_t *isreachable, struct rnh *rnh),
 		(pp, isreachable, rnh));
-struct in_addr g_infovlay_ipv4;
+extern struct in_addr g_infovlay_ipv4;
 extern struct trkr_client *g_infovlay_trkr;
 int g_inf_nhcntr_read_success = 0;
 extern int g_inf_is_controller;
@@ -704,6 +704,11 @@ zebra_rnh_resolve_nexthop_entry(vrf_id_t vrfid, int family,
 					"re_type=%d rnh_flags=%d",
 					vrfid, bufn, re, rn, re->status, re->flags, re->type, rnh->flags);
 			}
+                        if (CHECK_FLAG(rnh->client_info_flag , ZEBRA_NHT_EBGP)) {
+                            char buf[INET6_ADDRSTRLEN];
+                            prefix2str(&nrn->p, buf, INET6_ADDRSTRLEN);
+                            fprintf(stdout, "SIVA EBGP set for prefix - %s", buf);
+                        }
 			if (!CHECK_FLAG(rnh->client_info_flag , ZEBRA_NHT_EBGP)) {
 				hook_call(evaluate_custom_nexthop, &nrn->p, &isreachable, rnh);
 				if (isreachable) {
