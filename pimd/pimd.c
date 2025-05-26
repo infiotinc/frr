@@ -47,6 +47,7 @@ const char *const PIM_ALL_ROUTERS = MCAST_ALL_ROUTERS;
 const char *const PIM_ALL_PIM_ROUTERS = MCAST_ALL_PIM_ROUTERS;
 const char *const PIM_ALL_IGMP_ROUTERS = MCAST_ALL_IGMP_ROUTERS;
 
+struct in_addr qpim_all_pim_routers_addr; 
 struct thread_master *master = NULL;
 uint32_t qpim_debugs = 0;
 int qpim_t_periodic =
