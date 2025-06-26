@@ -986,7 +986,7 @@ static int nexthop_active_update(struct route_node *rn, struct route_entry *re,
 			re->nexthop_active_num++;
 		/* Don't allow src setting on IPv6 addr for now */
 		if (prev_active != new_active || prev_index != nexthop->ifindex
-		    || ((nexthop->type >= NEXTHOP_TYPE_IFINDEX
+		    || (re->type == ZEBRA_ROUTE_STATIC) || ((nexthop->type >= NEXTHOP_TYPE_IFINDEX
 			 && nexthop->type < NEXTHOP_TYPE_IPV6)
 			&& prev_src.ipv4.s_addr
 				   != nexthop->rmap_src.ipv4.s_addr)
