@@ -1881,6 +1881,14 @@ enum dp_req_result kernel_route_rib(struct route_node *rn,
 
 	assert(old || new);
 
+	if (old) {
+		ret = netlink_route_multipath(RTM_DELROUTE, p, src_p, old, 0);
+
+		kernel_route_rib_pass_fail(rn, p, old,
+					   (!ret) ? DP_DELETE_SUCCESS
+						  : DP_DELETE_FAILURE);
+	}
+
 	if (new) {
 		if (p->family == AF_INET || v6_rr_semantics)
 			ret = netlink_route_multipath(RTM_NEWROUTE, p, src_p,
@@ -1910,13 +1918,6 @@ enum dp_req_result kernel_route_rib(struct route_node *rn,
 		return DP_REQUEST_SUCCESS;
 	}
 
-	if (old) {
-		ret = netlink_route_multipath(RTM_DELROUTE, p, src_p, old, 0);
-
-		kernel_route_rib_pass_fail(rn, p, old,
-					   (!ret) ? DP_DELETE_SUCCESS
-						  : DP_DELETE_FAILURE);
-	}
 
 	return DP_REQUEST_SUCCESS;
 }
