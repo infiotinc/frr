@@ -56,6 +56,8 @@ struct rnh {
 #define ZEBRA_NHT_DELETED 0x2
 #define ZEBRA_NHT_RESOLVE_VIA_DEFAULT 0x4
 
+	uint8_t client_info_flag;
+#define ZEBRA_NHT_EBGP          0x1
 	/* VRF identifier. */
 	vrf_id_t vrf_id;
 
@@ -79,6 +81,10 @@ struct rnh {
 	int filtered[ZEBRA_ROUTE_MAX];
 
 	struct rnh_list_item rnh_list_item;
+#ifdef ZEBRA_INFIOT_CUSTOM_NEXTHOP_CHECK
+	int dest_trkr_index;
+	int nh_trkr_index;
+#endif
 };
 
 #define DISTANCE_INFINITY  255
