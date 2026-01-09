@@ -5099,7 +5099,6 @@ static int peer_tcp_user_timeout_set_vty(struct vty *vty, const char *ip_str,
 {
     struct peer *peer;
     uint32_t timeout_sec;
-    uint32_t timeout_ms;
     int ret;
 
     peer = peer_and_group_lookup_vty(vty, ip_str);
@@ -5113,10 +5112,7 @@ static int peer_tcp_user_timeout_set_vty(struct vty *vty, const char *ip_str,
         return CMD_WARNING_CONFIG_FAILED;
     }
 
-    timeout_ms = timeout_sec * 1000;
-
-
-    ret = peer_tcp_user_timeout_set(peer, timeout_ms);
+    ret = peer_tcp_user_timeout_set(peer, timeout_sec);
     return bgp_vty_return(vty, ret);
 }
 
