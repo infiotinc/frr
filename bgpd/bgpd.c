@@ -4828,16 +4828,16 @@ int peer_timers_unset(struct peer *peer)
 	return 0;
 }
 
-int peer_tcp_user_timeout_set(struct peer *peer, uint32_t timeout_ms)
+int peer_tcp_user_timeout_set(struct peer *peer, uint32_t timeout_sec)
 {
     struct peer *member;
     struct listnode *node, *nnode;
 
-    if (timeout_ms > (65535 * 1000))
+    if (timeout_sec > 65535)
         return BGP_ERR_INVALID_VALUE;
 
     SET_FLAG(peer->flags, PEER_FLAG_TCP_USER_TIMEOUT);
-    atomic_store(&peer->tcpusrto, timeout_ms);
+    atomic_store(&peer->tcpusrto, timeout_sec);
 
     if (!CHECK_FLAG(peer->sflags, PEER_STATUS_GROUP))
         return 0;
