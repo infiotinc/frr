@@ -845,22 +845,18 @@ void zebra_rib_evaluate_rn_nexthops(struct route_node *rn, uint32_t seq,
 	 * or a route within the overlay supernet (169.254.0.0/16) can change
 	 * overlay NHT state.
 	 */
-	const bool overlay_relevant =
-		is_default_prefix(&rn->p)
-		|| prefix_match(&g_infovlay_prefix, &rn->p);
-	if (overlay_relevant) {
-		g_overlay_trkr_eval_seq++;
-	}
-
+	const bool overlay_relevant = (rn->p.family == AF_INET && prefix_match(&g_infovlay_prefix, &rn->p));
 	if (overlay_relevant && dest) {
+		if (++g_overlay_trkr_eval_seq == 0) {//wrapcase
+			g_overlay_trkr_eval_seq = 1;  // ← Skip 0, go to 1 instead
+		}
 		struct zebra_vrf *zvrf = rib_dest_vrf(dest);
 		struct rib_table_info *info = srcdest_rnode_table_info(trigger_rn);
-
 		if (zvrf && info) {
-			zebra_rnh_prescan_overlay_nht(
-				zvrf, info->afi, 0, &trigger_rn->p, info->safi);
+			zebra_rnh_evaluate_overlay_prefixes(zvrf, info->afi, 0, &trigger_rn->p, info->safi);
 		}
 	}
+
 #endif
 	/*
 	 * We are storing the rnh's associated withb
