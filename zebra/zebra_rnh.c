@@ -578,6 +578,7 @@ static int check_overlay_nexthop(struct prefix *pp, uint8_t *isreachable, struct
 	if (rnh->overlay_trkr_seq == g_overlay_trkr_eval_seq) {
 		*isreachable = rnh->overlay_trkr_reachable;
 		if (IS_ZEBRA_DEBUG_NHT) {
+			inet_ntop(pp->family, &pp->u.prefix, via, PREFIX2STR_BUFFER);
 			zlog_debug("Overlay cache HIT for %s: reachable=%d seq=%u",
 				   via, *isreachable, g_overlay_trkr_eval_seq);
 		}
