@@ -46,8 +46,8 @@ extern void zebra_remove_rnh_client(struct rnh *rnh, struct zserv *client);
 extern void zebra_evaluate_rnh(struct zebra_vrf *zvrf, afi_t afi, int force,
 			       const struct prefix *p, safi_t safi);
 #ifdef ZEBRA_INFIOT_CUSTOM_NEXTHOP_CHECK
-extern void zebra_rnh_prescan_overlay_nht(struct zebra_vrf *zvrf, afi_t afi,
-			int force, const struct prefix *p, safi_t safi);
+extern void zebra_rnh_evaluate_overlay_prefixes(struct zebra_vrf *zvrf, afi_t afi,
+            int force, const struct prefix *skip_p, safi_t safi);
 #endif
 extern void zebra_print_rnh_table(vrf_id_t vrfid, afi_t afi, safi_t safi,
 				  struct vty *vty, const struct prefix *p,

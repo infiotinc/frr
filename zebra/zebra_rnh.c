@@ -84,11 +84,6 @@ static void print_rnh(struct route_node *rn, struct vty *vty,
 		      json_object *json);
 static int zebra_client_cleanup_rnh(struct zserv *client);
 
-#ifdef ZEBRA_INFIOT_CUSTOM_NEXTHOP_CHECK
-static void zebra_rnh_evaluate_overlay_prefixes(struct zebra_vrf *zvrf, afi_t afi,
-                                                int force, const struct prefix *skip_p,
-                                                safi_t safi);
-#endif
 
 void zebra_rnh_init(void)
 {
@@ -952,7 +947,7 @@ static void zebra_rnh_clear_nhc_flag(struct zebra_vrf *zvrf, afi_t afi,
 }
 
 #ifdef ZEBRA_INFIOT_CUSTOM_NEXTHOP_CHECK
-static void zebra_rnh_evaluate_overlay_prefixes(struct zebra_vrf *zvrf, afi_t afi,
+void zebra_rnh_evaluate_overlay_prefixes(struct zebra_vrf *zvrf, afi_t afi,
 						int force, const struct prefix *skip_p,
 						safi_t safi)
 {
@@ -979,26 +974,6 @@ static void zebra_rnh_evaluate_overlay_prefixes(struct zebra_vrf *zvrf, afi_t af
 		zebra_rnh_evaluate_entry(zvrf, afi, force, nrn);
 	}
 }
-
-void zebra_rnh_prescan_overlay_nht(struct zebra_vrf *zvrf, afi_t afi,
-							   int force, const struct prefix *p,
-							   safi_t safi)
-{
-	/* Guard against re-entrant invocation while pre-scan is in progress. */
-	static bool overlay_prescan_active = false;
-
-	if (!overlay_prescan_active && p != NULL
-	    && p->family == g_infovlay_prefix.family
-	    && (is_default_prefix(p) ||
-		prefix_match(&g_infovlay_prefix, p))) {
-		overlay_prescan_active = true;
-		if (IS_ZEBRA_DEBUG_NHT)
-			zlog_debug("overlay pre-scan seq=%u skip_p=%pFX",
-				   g_overlay_trkr_eval_seq, p);
-		zebra_rnh_evaluate_overlay_prefixes(zvrf, afi, force, p, safi);
-		overlay_prescan_active = false;
-	}
-}
 #endif
 
 /* Evaluate all tracked entries (nexthops or routes for import into BGP)
@@ -1014,13 +989,6 @@ void zebra_evaluate_rnh(struct zebra_vrf *zvrf, afi_t afi, int force,
 	if (!rnh_table) // unexpected
 		return;
 
-#ifdef ZEBRA_INFIOT_CUSTOM_NEXTHOP_CHECK
-	/* Before normal evaluation paths, force reevaluation of all tracked
-	 * overlay nexthops for this VRF/AFI/SAFI to flush stale state quickly.
-	 * Skip 'p' when provided to avoid duplicate work in the specific path.
-	 */
-	zebra_rnh_evaluate_overlay_prefixes(zvrf, afi, force, p, safi);
-#endif
 	if (p) {
 		/* Evaluating a specific entry, make sure it exists. */
 		nrn = route_node_lookup(rnh_table, p);
