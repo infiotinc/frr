@@ -2126,6 +2126,39 @@ zebra_nhg_connected_ifindex(struct route_node *rn, struct route_entry *match,
 extern uint8_t g_skip_rtnetlink;
 
 /*
+zebra: fix nexthop ifindex for cross-VRF BGP routes
+
+When a BGP route in a non-default VRF resolves its nexthop via the
+default VRF, zebra was incorrectly selecting the overlay interface
+instead of the VRF tunnel interface (e.g., segment1tun). Fix by
+substituting the ifindex with <vrf_name>tun when the resolved
+interface is overlay and the route VRF differs from the nexthop VRF.
+*/
+static void zebra_nexthop_fix_vrf_ifindex(vrf_id_t vrf_id, struct nexthop *nexthop)
+{
+    if (vrf_id == nexthop->vrf_id)
+        return;
+
+    const char *ifname = ifindex2ifname(nexthop->ifindex, nexthop->vrf_id);
+    if (strncmp(ifname, "overlay", strlen("overlay")) != 0)
+        return;
+
+    char vrftunname[INTERFACE_NAMSIZ];
+    snprintf(vrftunname, sizeof(vrftunname), "%s%s",
+             vrf_id_to_name(vrf_id), "tun");
+
+    ifindex_t tunindex = ifname2ifindex(vrftunname, vrf_id);
+    if (tunindex) {
+        zlog_debug("%s: fixing ifindex overlay->%s (vrf %u)",
+                   __func__, vrftunname, vrf_id);
+        nexthop->ifindex = tunindex;
+    } else {
+		zlog_debug("%s: failed to fix ifindex for overlay (vrf %u)",
+				   __func__, vrf_id);
+	}
+}
+
+/*
  * Given a nexthop we need to properly recursively resolve,
  * do a table lookup to find and match if at all possible.
  * Set the nexthop->ifindex and resolution info as appropriate.
@@ -2392,9 +2425,11 @@ static int nexthop_active(struct nexthop *nexthop, struct nhg_hash_entry *nhe,
 			newhop = match->nhe->nhg.nexthop;
 			if (nexthop->type == NEXTHOP_TYPE_IPV4) {
 				nexthop->ifindex = newhop->ifindex;
+				zebra_nexthop_fix_vrf_ifindex(vrf_id, nexthop);
 				nexthop->type = NEXTHOP_TYPE_IPV4_IFINDEX;
 			} else if (nexthop->type == NEXTHOP_TYPE_IPV6) {
 				nexthop->ifindex = newhop->ifindex;
+				zebra_nexthop_fix_vrf_ifindex(vrf_id, nexthop);
 				nexthop->type = NEXTHOP_TYPE_IPV6_IFINDEX;
 			} else if (nexthop->ifindex != newhop->ifindex) {
 				if (IS_ZEBRA_DEBUG_RIB_DETAILED)
@@ -2474,6 +2509,8 @@ static int nexthop_active(struct nexthop *nexthop, struct nhg_hash_entry *nhe,
 								nexthop, NULL);
 				resolved = 1;
 
+				if (resolver)
+					zebra_nexthop_fix_vrf_ifindex(vrf_id, nexthop);
 				/* If there are backup nexthops, capture
 				 * that info with the resolving nexthop.
 				 */
