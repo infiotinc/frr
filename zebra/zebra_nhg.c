@@ -2136,7 +2136,7 @@ interface is overlay and the route VRF differs from the nexthop VRF.
 */
 static void zebra_nexthop_fix_vrf_ifindex(vrf_id_t vrf_id, struct nexthop *nexthop)
 {
-    if (vrf_id == nexthop->vrf_id)
+    if (vrf_id == VRF_DEFAULT)
         return;
 
     const char *ifname = ifindex2ifname(nexthop->ifindex, nexthop->vrf_id);
@@ -2149,8 +2149,10 @@ static void zebra_nexthop_fix_vrf_ifindex(vrf_id_t vrf_id, struct nexthop *nexth
 
     ifindex_t tunindex = ifname2ifindex(vrftunname, vrf_id);
     if (tunindex) {
-        zlog_debug("%s: fixing ifindex overlay->%s (vrf %u)",
-                   __func__, vrftunname, vrf_id);
+        zlog_debug("%s: NH fixup gateway=%pI4 type=%d flags=0x%x ifname:'%s'(%d) -> tunnel='%s'(%d) vrf=%u",
+            __func__, &nexthop->gate.ipv4,
+            nexthop->type, nexthop->flags,
+            ifname, nexthop->ifindex, vrftunname, tunindex, vrf_id);
         nexthop->ifindex = tunindex;
     } else {
 		zlog_debug("%s: failed to fix ifindex for overlay (vrf %u)",
@@ -2510,7 +2512,7 @@ static int nexthop_active(struct nexthop *nexthop, struct nhg_hash_entry *nhe,
 				resolved = 1;
 
 				if (resolver)
-					zebra_nexthop_fix_vrf_ifindex(vrf_id, nexthop);
+					zebra_nexthop_fix_vrf_ifindex(vrf_id, resolver);
 				/* If there are backup nexthops, capture
 				 * that info with the resolving nexthop.
 				 */
