@@ -838,7 +838,33 @@ void zebra_rib_evaluate_rn_nexthops(struct route_node *rn, uint32_t seq,
 {
 	rib_dest_t *dest = rib_dest_from_rnode(rn);
 	struct rnh *rnh;
+#ifdef ZEBRA_INFIOT_CUSTOM_NEXTHOP_CHECK
+	struct route_node *trigger_rn = rn;
+	const uint32_t overlay_special_v4 = htonl(0x7f7f7f7f);
+	/* Determine whether this route change can affect overlay reachability.
+	 * a route within the overlay supernet (169.254.0.0/16) or 127.127.127.127/32
+	 * can change overlay NHT state.
+	 */
+	const bool overlay_relevant =
+		(rn->p.family == AF_INET
+		 && (prefix_match(&g_infovlay_prefix, &rn->p)
+		     || (rn->p.prefixlen == IPV4_MAX_BITLEN
+			 && rn->p.u.prefix4.s_addr == overlay_special_v4)));
+	if (overlay_relevant && dest) {
+		if (IS_ZEBRA_DEBUG_NHT_DETAILED)
+			zlog_debug(
+				"%s: overlay_relevant is set for %pRN", __func__, rn);
+		if (++g_overlay_trkr_eval_seq == 0) {//wrapcase
+			g_overlay_trkr_eval_seq = 1;  // Skip 0, go to 1 instead
+		}
+		struct zebra_vrf *zvrf = rib_dest_vrf(dest);
+		struct rib_table_info *info = srcdest_rnode_table_info(trigger_rn);
+		if (zvrf && info) {
+			zebra_rnh_evaluate_overlay_prefixes(zvrf, info->afi, 0, &trigger_rn->p, info->safi);
+		}
+	}
 
+#endif
 	/*
 	 * We are storing the rnh's associated withb
 	 * the tracked nexthop as a list of the rn's.
@@ -904,6 +930,22 @@ void zebra_rib_evaluate_rn_nexthops(struct route_node *rn, uint32_t seq,
 			}
 
 			rnh->seqno = seq;
+#ifdef ZEBRA_INFIOT_CUSTOM_NEXTHOP_CHECK
+			/* Skip overlay RNH evaluations for non-overlay-relevant
+			 * route changes.  All unreachable overlay RNHs park at
+			 * 0.0.0.0/0's nht list; the while(rn) walk always reaches
+			 * 0.0.0.0/0, so without this guard every route install
+			 * triggers full RNH evaluations. Overlay reachability is
+			 * independent of non-overlay routes so skipping is safe. */
+			if (!overlay_relevant
+			    && p->family == AF_INET
+			    && prefix_match(&g_infovlay_prefix, p)) {
+				if (IS_ZEBRA_DEBUG_NHT) {
+					zlog_debug("skip overlay RNH %pFX non-overlay route change", p);
+				}
+				continue;
+			}
+#endif
 			zebra_evaluate_rnh(zvrf, family2afi(p->family), 0, p,
 					   rnh->safi);
 		}

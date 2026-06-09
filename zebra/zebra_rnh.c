@@ -73,6 +73,10 @@ extern struct trkr_client *g_infovlay_trkr;
 int g_inf_nhcntr_read_success = 0;
 extern int g_inf_is_controller;
 extern struct list *g_inf_ctrl_overlay_ips;
+/* Epoch counter: incremented once per overlay/default route-change event in
+ * zebra_rib_evaluate_rn_nexthops(). Per-RNH cache in check_overlay_nexthop()
+ * uses this to skip redundant SHM lookups within the same batch. */
+uint32_t g_overlay_trkr_eval_seq = 1;
 #endif
 
 static bool compare_state(struct route_entry *r1, struct route_entry *r2);
@@ -80,11 +84,6 @@ static void print_rnh(struct route_node *rn, struct vty *vty,
 		      json_object *json);
 static int zebra_client_cleanup_rnh(struct zserv *client);
 
-#ifdef ZEBRA_INFIOT_CUSTOM_NEXTHOP_CHECK
-static void zebra_rnh_evaluate_overlay_prefixes(struct zebra_vrf *zvrf, afi_t afi,
-                                                int force, const struct prefix *skip_p,
-                                                safi_t safi);
-#endif
 
 void zebra_rnh_init(void)
 {
@@ -574,6 +573,18 @@ static int check_overlay_nexthop(struct prefix *pp, uint8_t *isreachable, struct
 		}
 	}
 
+	/* Epoch cache hit: result already computed for this route-change.
+	 * Return immediately without touching SHM. */
+	if (rnh->overlay_trkr_seq == g_overlay_trkr_eval_seq) {
+		*isreachable = rnh->overlay_trkr_reachable;
+		if (IS_ZEBRA_DEBUG_NHT) {
+			inet_ntop(pp->family, &pp->u.prefix, via, PREFIX2STR_BUFFER);
+			zlog_debug("Overlay cache HIT for %s: reachable=%d seq=%u",
+				   via, *isreachable, g_overlay_trkr_eval_seq);
+		}
+		return *isreachable;
+	}
+
 	// It is possible that when zebra starts, click has not created the
 	// SHM in which case the client initialization will fail in infnh_init.
 	// retry here
@@ -618,6 +629,9 @@ static int check_overlay_nexthop(struct prefix *pp, uint8_t *isreachable, struct
 		zlog_debug("Infiot via: %s, cntrname %s val %llu reachable %d nhindex %d destindex %d", via, cntrname,
 			trkr == NULL ? 1 : trkr->val, *isreachable, rnh->nh_trkr_index, rnh->dest_trkr_index);
 	}
+	/* Store SHM result in per-RNH epoch cache for future hits this batch. */
+	rnh->overlay_trkr_seq = g_overlay_trkr_eval_seq;
+	rnh->overlay_trkr_reachable = *isreachable;
 	return *isreachable;
 }
 #endif
@@ -934,7 +948,7 @@ static void zebra_rnh_clear_nhc_flag(struct zebra_vrf *zvrf, afi_t afi,
 }
 
 #ifdef ZEBRA_INFIOT_CUSTOM_NEXTHOP_CHECK
-static void zebra_rnh_evaluate_overlay_prefixes(struct zebra_vrf *zvrf, afi_t afi,
+void zebra_rnh_evaluate_overlay_prefixes(struct zebra_vrf *zvrf, afi_t afi,
 						int force, const struct prefix *skip_p,
 						safi_t safi)
 {
@@ -976,13 +990,6 @@ void zebra_evaluate_rnh(struct zebra_vrf *zvrf, afi_t afi, int force,
 	if (!rnh_table) // unexpected
 		return;
 
-#ifdef ZEBRA_INFIOT_CUSTOM_NEXTHOP_CHECK
-	/* Before normal evaluation paths, force reevaluation of all tracked
-	 * overlay nexthops for this VRF/AFI/SAFI to flush stale state quickly.
-	 * Skip 'p' when provided to avoid duplicate work in the specific path.
-	 */
-	zebra_rnh_evaluate_overlay_prefixes(zvrf, afi, force, p, safi);
-#endif
 	if (p) {
 		/* Evaluating a specific entry, make sure it exists. */
 		nrn = route_node_lookup(rnh_table, p);
