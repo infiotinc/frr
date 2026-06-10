@@ -850,15 +850,15 @@ void zebra_rib_evaluate_rn_nexthops(struct route_node *rn, uint32_t seq,
 		 && (prefix_match(&g_infovlay_prefix, &rn->p)
 		     || (rn->p.prefixlen == IPV4_MAX_BITLEN
 			 && rn->p.u.prefix4.s_addr == overlay_special_v4)));
-	if (overlay_relevant && dest) {
+	if (overlay_relevant) {
 		if (IS_ZEBRA_DEBUG_NHT_DETAILED)
 			zlog_debug(
 				"%s: overlay_relevant is set for %pRN", __func__, rn);
 		if (++g_overlay_trkr_eval_seq == 0) {//wrapcase
 			g_overlay_trkr_eval_seq = 1;  // Skip 0, go to 1 instead
 		}
-		struct zebra_vrf *zvrf = rib_dest_vrf(dest);
 		struct rib_table_info *info = srcdest_rnode_table_info(trigger_rn);
+		struct zebra_vrf *zvrf = info ? info->zvrf : NULL;
 		if (zvrf && info) {
 			zebra_rnh_evaluate_overlay_prefixes(zvrf, info->afi, 0, &trigger_rn->p, info->safi);
 		}

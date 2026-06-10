@@ -73,7 +73,7 @@ extern struct trkr_client *g_infovlay_trkr;
 int g_inf_nhcntr_read_success = 0;
 extern int g_inf_is_controller;
 extern struct list *g_inf_ctrl_overlay_ips;
-/* Epoch counter: incremented once per overlay/default route-change event in
+/* Epoch counter: incremented once per overlay/127.127.127.127/32 route-change event in
  * zebra_rib_evaluate_rn_nexthops(). Per-RNH cache in check_overlay_nexthop()
  * uses this to skip redundant SHM lookups within the same batch. */
 uint32_t g_overlay_trkr_eval_seq = 1;
