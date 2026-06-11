@@ -1199,17 +1199,15 @@ static bool leak_update_nexthop_valid(struct bgp *to_bgp, struct bgp_dest *bn,
 	 * leaked between VRFs with accept-own community.
 	 */
 	if (bpi_ultimate->sub_type == BGP_ROUTE_REDISTRIBUTE ||
-	    bpi_ultimate->sub_type == BGP_ROUTE_STATIC ||
 	    is_pi_family_evpn(bpi_ultimate) ||
 	    CHECK_FLAG(bpi_ultimate->flags, BGP_PATH_ACCEPT_OWN))
 		nh_valid = true;
-	else
-		/*
-		 * TBD do we need to do anything about the
-		 * 'connected' parameter?
-		 */
+	else {
 		nh_valid = bgp_find_or_add_nexthop(to_bgp, bgp_nexthop, afi,
 						   safi, bpi, NULL, 0, p);
+		if (!nh_valid && bpi_ultimate->sub_type == BGP_ROUTE_STATIC)
+			nh_valid = true;
+	}
 
 	/*
 	 * If you are using SRv6 VPN instead of MPLS, it need to check
