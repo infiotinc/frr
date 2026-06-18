@@ -1050,8 +1050,8 @@ static void unsetsids(struct bgp_path_info *bpi)
 	memset(extra->sid, 0, sizeof(extra->sid));
 }
 
-/* Extract vnet_id from VRF name of the form "segment<id>".
- * Returns >=0 on success, -1 on failure.
+/* Extract vnet_id from VRF name of the form "segment<id>" or "VRF segment<id>".
+ * Returns >= 0 on success, -1 on failure.
  */
 static int vrf_name_get_vnet_id(const char *name)
 {
@@ -1068,47 +1068,38 @@ static int vrf_name_get_vnet_id(const char *name)
 	else
 		p = name;
 
-	/* Trim leading spaces */
 	while (*p == ' ')
 		++p;
 
 	if (strncmp(p, "segment", 7) != 0)
 		return -1;
 
-	p += 7; /* now at first digit */
+	p += 7;
 
 	if (!isdigit((unsigned char)*p))
 		return -1;
 
 	id = strtol(p, &end, 10);
 
-	/* Allow trailing spaces only */
 	while (*end == ' ')
 		++end;
 
-	if (*end != '\0')
-		return -1;
-
-	if (id < 0 || id > 0xFFFFFFFF)
+	if (*end != '\0' || id < 0 || id > 0xFFFFFFFF)
 		return -1;
 
 	return (int)id;
 }
 
-/* Check for an RT exactly matching: <local-AS>:<vnet_id>
- * (vnet_id derived from VRF name "segment<id>").
- * Accept both 2-byte and 4-byte AS encodings.
- * For ECOMMUNITY_ENCODE_AS:
- *   Global Admin = 2-byte AS
- *   Local  Admin = 4-byte value
- * For ECOMMUNITY_ENCODE_AS4:
- *   Global Admin = 4-byte AS
- *   Local  Admin = 2-byte value
+/*
+ * Return true if the route carries an RT of exactly <local-AS>:<vnet_id>,
+ * where vnet_id is derived from the destination VRF name "segment<N>".
+ * Accepts both 2-byte-AS (ECOMMUNITY_ENCODE_AS) and 4-byte-AS
+ * (ECOMMUNITY_ENCODE_AS4) encodings.
  */
 static bool leak_has_local_rt_vnet(const struct attr *attr,
-				const struct bgp *to_bgp,
-				const struct prefix *prefix,
-				int debug)
+				   const struct bgp *to_bgp,
+				   const struct prefix *prefix,
+				   int debug)
 {
 	const struct ecommunity *ec;
 	const uint8_t *p;
@@ -1128,8 +1119,8 @@ static bool leak_has_local_rt_vnet(const struct attr *attr,
 		return false;
 
 	if (debug)
-		zlog_debug("%s: %pFX nexthop local AS %d vnet id %d", __func__, prefix,
-				local_as, vnet_id);
+		zlog_debug("%s: %pFX nexthop local AS %u vnet id %d",
+			   __func__, prefix, local_as, vnet_id);
 
 	ec = bgp_attr_get_ecommunity(attr);
 	if (!ec || !ec->size || ec->unit_size != ECOMMUNITY_SIZE)
@@ -1146,27 +1137,19 @@ static bool leak_has_local_rt_vnet(const struct attr *attr,
 		if (type == ECOMMUNITY_ENCODE_AS && local_as <= 0xFFFF) {
 			as_t asn = ((as_t)p[2] << 8) | (as_t)p[3];
 			uint32_t local_admin = ((uint32_t)p[4] << 24) |
-						((uint32_t)p[5] << 16) |
-						((uint32_t)p[6] << 8)  |
-						(uint32_t)p[7];
-			if (debug)
-				zlog_debug("ECOMM ENCODED in AS: asn %d local_admin %d",
-						asn, local_admin);
+					       ((uint32_t)p[5] << 16) |
+					       ((uint32_t)p[6] << 8)  |
+					       (uint32_t)p[7];
 			if (asn == (local_as & 0xFFFF) &&
 			    local_admin == (uint32_t)vnet_id)
 				return true;
 		} else if (type == ECOMMUNITY_ENCODE_AS4) {
-			as_t asn = ((as_t)p[2] << 24) |
-				((as_t)p[3] << 16) |
-				((as_t)p[4] << 8)  |
-				(as_t)p[5];
+			as_t asn = ((as_t)p[2] << 24) | ((as_t)p[3] << 16) |
+				   ((as_t)p[4] << 8)  |  (as_t)p[5];
 			uint16_t local_admin = ((uint16_t)p[6] << 8) |
-						(uint16_t)p[7];
-			if (debug)
-				zlog_debug("ECOMM ENCODED in AS4: asn %d local_admin %d",
-						asn, local_admin);
+					       (uint16_t)p[7];
 			if (asn == local_as &&
-				local_admin == (uint16_t)(vnet_id & 0xFFFF))
+			    local_admin == (uint16_t)(vnet_id & 0xFFFF))
 				return true;
 		}
 	}
@@ -1219,12 +1202,28 @@ static bool leak_update_nexthop_valid(struct bgp *to_bgp, struct bgp_dest *bn,
 		nh_valid = false;
 	}
 
-	/* Force valid if RT matches <local-as>:<vnet_id> derived from VRF name */
 	if (!nh_valid && leak_has_local_rt_vnet(new_attr, to_bgp, p, debug)) {
-		nh_valid = true;
-		if (debug)
-			zlog_debug("%s: %pFX forcing VALID local-AS match (AS %u) segment  %s",
-			__func__, p, to_bgp->as, bgp_nexthop->name_pretty);
+		struct bgp_nexthop_cache *bnc = bpi->nexthop;
+		bool nht_explicitly_unresolved =
+			bnc
+			&& CHECK_FLAG(bnc->flags, BGP_NEXTHOP_REGISTERED)
+			&& bnc->last_update > 0
+			&& !CHECK_FLAG(bnc->flags, BGP_NEXTHOP_VALID);
+
+		if (!nht_explicitly_unresolved) {
+			nh_valid = true;
+			if (debug)
+				zlog_debug(
+					"%s: %pFX forcing VALID local-AS RT match (AS %u) vrf %s",
+					__func__, p, to_bgp->as,
+					bgp_nexthop->name_pretty);
+		} else {
+			if (debug)
+				zlog_debug(
+					"%s: %pFX NOT forcing VALID: NHT explicitly unresolved (AS %u) vrf %s",
+					__func__, p, to_bgp->as,
+					bgp_nexthop->name_pretty);
+		}
 	}
 
 	if (debug)
