@@ -2783,6 +2783,9 @@ static void peer_group2peer_config_copy(struct peer_group *group,
 		PEER_ATTR_INHERIT(peer, group, keepalive);
 	}
 
+	if (!CHECK_FLAG(peer->flags_override, PEER_FLAG_TCP_USER_TIMEOUT))
+		PEER_ATTR_INHERIT(peer, group, tcpusrto);
+
 	if (!CHECK_FLAG(peer->flags_override, PEER_FLAG_TIMER_CONNECT)) {
 		PEER_ATTR_INHERIT(peer, group, connect);
 		if (CHECK_FLAG(conf->flags, PEER_FLAG_TIMER_CONNECT))
@@ -5880,6 +5883,10 @@ int peer_tcp_user_timeout_set(struct peer *peer, uint32_t timeout_sec)
 
     if (timeout_sec > 65535)
         return BGP_ERR_INVALID_VALUE;
+
+    /* Value 0 means kernel default (no custom timeout) — treat as unset. */
+    if (timeout_sec == 0)
+        return peer_tcp_user_timeout_unset(peer);
 
     SET_FLAG(peer->flags, PEER_FLAG_TCP_USER_TIMEOUT);
     atomic_store(&peer->tcpusrto, timeout_sec);

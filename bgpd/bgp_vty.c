@@ -17473,8 +17473,9 @@ static void bgp_config_write_peer_global(struct vty *vty, struct bgp *bgp,
 		vty_out(vty, " neighbor %s timers %u %u\n", addr,
 			peer->keepalive, peer->holdtime);
 
-        if (peergroup_flag_check(peer, PEER_FLAG_TCP_USER_TIMEOUT))
-                vty_out(vty, " neighbor %s tcp-user-timeout %u \n", addr,
+        if (peergroup_flag_check(peer, PEER_FLAG_TCP_USER_TIMEOUT) &&
+            peer->tcpusrto > 0)
+                vty_out(vty, " neighbor %s tcp-user-timeout %u\n", addr,
                         peer->tcpusrto);
 
 	/* timers connect */
