@@ -1352,7 +1352,6 @@ struct peer {
 #define PEER_FLAG_PASSWORD                  (1ULL << 20) /* password */
 #define PEER_FLAG_LOCAL_AS                  (1ULL << 21) /* local-as */
 #define PEER_FLAG_UPDATE_SOURCE             (1ULL << 22) /* update-source */
-#define PEER_FLAG_TCP_USER_TIMEOUT          (1ULL << 23) /* tcp user timeout */
 
 	/* BGP-GR Peer related  flags */
 #define PEER_FLAG_GRACEFUL_RESTART_HELPER   (1ULL << 23) /* Helper */
@@ -1378,6 +1377,7 @@ struct peer {
 #define PEER_FLAG_PORT (1ULL << 33)
 #define PEER_FLAG_AIGP (1ULL << 34)
 #define PEER_FLAG_GRACEFUL_SHUTDOWN (1ULL << 35)
+#define PEER_FLAG_TCP_USER_TIMEOUT   (1ULL << 36) /* tcp user timeout */
 
 	/*
 	 *GR-Disabled mode means unset PEER_FLAG_GRACEFUL_RESTART
