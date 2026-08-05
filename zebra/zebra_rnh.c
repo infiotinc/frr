@@ -210,6 +210,7 @@ struct rnh *zebra_add_rnh(struct prefix *p, vrf_id_t vrfid, safi_t safi,
 #ifdef ZEBRA_INFIOT_CUSTOM_NEXTHOP_CHECK
 		rnh->dest_trkr_index = -1;
 		rnh->nh_trkr_index = -1;
+		rnh->self_mthub_trkr_index = -1;
 #endif
 		zebra_rnh_store_in_routing_table(rnh);
 	} else
@@ -594,6 +595,21 @@ static int check_overlay_nexthop(struct prefix *pp, uint8_t *isreachable, struct
 			zlog_debug("infiot overlay trkr null reachable %d", *isreachable);
 			return *isreachable;
 		}
+	}
+
+	inet_ntop(AF_INET, &g_infovlay_ipv4, selfip, PREFIX2STR_BUFFER);
+	snprintf(cntrname, 256, "mthub.overlay.%s", selfip);
+	const trkr_t *self_trkr = trkr_client_get_trkr_by_index(
+		g_infovlay_trkr, cntrname, 0, 1, &rnh->self_mthub_trkr_index);
+	if (self_trkr && self_trkr->val > 0) {
+		*isreachable = 1;
+		if (IS_ZEBRA_DEBUG_NHT) {
+			zlog_debug("local mthub connectivity (%s val %llu) -> all peers reachable",
+				   cntrname, self_trkr->val);
+		}
+		rnh->overlay_trkr_seq = g_overlay_trkr_eval_seq;
+		rnh->overlay_trkr_reachable = *isreachable;
+		return *isreachable;
 	}
 
 	//get the nextop to check if it is connected.
