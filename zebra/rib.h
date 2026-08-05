@@ -84,6 +84,7 @@ struct rnh {
 #ifdef ZEBRA_INFIOT_CUSTOM_NEXTHOP_CHECK
         int dest_trkr_index;
         int nh_trkr_index;
+        int self_mthub_trkr_index;
         /* Epoch cache: stores the g_overlay_trkr_eval_seq value at which the
          * last SHM lookup was performed and its result, so that repeated calls
          * within the same route-change batch are free. This avoids a linear
