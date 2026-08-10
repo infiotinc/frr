@@ -345,6 +345,7 @@ struct zapi_route {
 	uint8_t distance;
 
 	uint32_t metric;
+        uint32_t overlay_path_cost;
 
 	route_tag_t tag;
 

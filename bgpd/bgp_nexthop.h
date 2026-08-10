@@ -40,6 +40,7 @@
 struct bgp_nexthop_cache {
 	/* IGP route's metric. */
 	uint32_t metric;
+        uint32_t overlay_path_cost;
 
 	/* Nexthop number and nexthop linked list.*/
 	uint8_t nexthop_num;
