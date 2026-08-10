@@ -867,6 +867,18 @@ static unsigned nexthop_active_check(struct route_node *rn,
 		family = AFI_IP6;
 	else
 		family = 0;
+
+
+        if (re->type == ZEBRA_ROUTE_KERNEL || re->type == ZEBRA_ROUTE_SYSTEM) {
+		struct interface *ifp;
+
+		ifp = if_lookup_by_index(nexthop->ifindex, nexthop->vrf_id);
+
+		if (ifp && if_is_up(ifp)) {
+			SET_FLAG(nexthop->flags, NEXTHOP_FLAG_ACTIVE);
+			goto skip_check;
+		}
+	}
 	switch (nexthop->type) {
 	case NEXTHOP_TYPE_IFINDEX:
 		ifp = if_lookup_by_index(nexthop->ifindex, nexthop->vrf_id);
@@ -917,6 +929,7 @@ static unsigned nexthop_active_check(struct route_node *rn,
 	if (!CHECK_FLAG(nexthop->flags, NEXTHOP_FLAG_ACTIVE))
 		return 0;
 
+skip_check:
 	/* XXX: What exactly do those checks do? Do we support
 	 * e.g. IPv4 routes with IPv6 nexthops or vice versa? */
 	if (RIB_SYSTEM_ROUTE(re) || (family == AFI_IP && p->family != AF_INET)
