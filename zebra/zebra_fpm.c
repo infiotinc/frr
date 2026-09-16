@@ -1395,11 +1395,7 @@ int zfpm_trigger_egress_update(struct infiot_egress_hook *upd, const char *reaso
 	}
 	info->dest = upd->dest;
 	info->size = upd->size;
-	//Linked list to store the egress information useful when the dataplane
-	//is down and we got the update from peer BGP. Cache and send once the
-	//data plane is up and running
 	TAILQ_INSERT_TAIL(&zfpm_g->egress_q, info, egress_q_entries);
-	free(upd);
 	if (zfpm_g->t_write)
 		return 0;
 	zfpm_egress_write_on();
