@@ -964,6 +964,86 @@ static void zebra_rnh_clear_nhc_flag(struct zebra_vrf *zvrf, afi_t afi,
 }
 
 #ifdef ZEBRA_INFIOT_CUSTOM_NEXTHOP_CHECK
+/* Debounce for zebra_rnh_schedule_overlay_prefixes_eval(): at 8k-tunnel scale
+ * a single route-change burst can generate thousands of overlay-relevant
+ * events in quick succession, and each one used to trigger its own immediate
+ * full walk of the (up to 8k-entry) RNH table. Coalesce a burst into a single
+ * walk per (vrf, afi, safi) after a short quiet period, instead of one walk
+ * per event. */
+#define OVERLAY_RNH_DEBOUNCE_MSEC 50
+#define OVERLAY_RNH_PENDING_MAX 8
+
+struct overlay_rnh_pending {
+	struct zebra_vrf *zvrf;
+	afi_t afi;
+	safi_t safi;
+};
+
+static struct overlay_rnh_pending overlay_rnh_pending[OVERLAY_RNH_PENDING_MAX];
+static int overlay_rnh_pending_count;
+static struct thread *overlay_rnh_debounce_ev;
+
+static void overlay_rnh_debounce_run(struct thread *t)
+{
+	int i;
+
+	overlay_rnh_debounce_ev = NULL;
+
+	if (++g_overlay_trkr_eval_seq == 0) /* wrapcase */
+		g_overlay_trkr_eval_seq = 1;
+
+	for (i = 0; i < overlay_rnh_pending_count; i++)
+		zebra_rnh_evaluate_overlay_prefixes(overlay_rnh_pending[i].zvrf,
+						     overlay_rnh_pending[i].afi,
+						     0, NULL,
+						     overlay_rnh_pending[i].safi);
+
+	overlay_rnh_pending_count = 0;
+}
+
+/*
+ * Schedule a coalesced overlay-RNH table walk for (zvrf, afi, safi) instead
+ * of walking it immediately. Repeated calls for the same tuple within the
+ * debounce window collapse into the single walk that runs when the timer
+ * fires.
+ */
+void zebra_rnh_schedule_overlay_prefixes_eval(struct zebra_vrf *zvrf, afi_t afi,
+					       safi_t safi)
+{
+	int i;
+
+	for (i = 0; i < overlay_rnh_pending_count; i++) {
+		if (overlay_rnh_pending[i].zvrf == zvrf
+		    && overlay_rnh_pending[i].afi == afi
+		    && overlay_rnh_pending[i].safi == safi)
+			break;
+	}
+
+	if (i == overlay_rnh_pending_count) {
+		if (overlay_rnh_pending_count < OVERLAY_RNH_PENDING_MAX) {
+			overlay_rnh_pending[overlay_rnh_pending_count].zvrf = zvrf;
+			overlay_rnh_pending[overlay_rnh_pending_count].afi = afi;
+			overlay_rnh_pending[overlay_rnh_pending_count].safi = safi;
+			overlay_rnh_pending_count++;
+		} else {
+			/* Pending table is unexpectedly full (more distinct
+			 * vrf/afi/safi tuples live than provisioned for) --
+			 * fall back to an immediate walk for this tuple rather
+			 * than drop it.
+			 */
+			if (++g_overlay_trkr_eval_seq == 0) /* wrapcase */
+				g_overlay_trkr_eval_seq = 1;
+			zebra_rnh_evaluate_overlay_prefixes(zvrf, afi, 0, NULL, safi);
+			return;
+		}
+	}
+
+	if (!overlay_rnh_debounce_ev)
+		thread_add_timer_msec(zrouter.master, overlay_rnh_debounce_run,
+				       NULL, OVERLAY_RNH_DEBOUNCE_MSEC,
+				       &overlay_rnh_debounce_ev);
+}
+
 void zebra_rnh_evaluate_overlay_prefixes(struct zebra_vrf *zvrf, afi_t afi,
 						int force, const struct prefix *skip_p,
 						safi_t safi)
