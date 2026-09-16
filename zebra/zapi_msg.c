@@ -2354,23 +2354,17 @@ static inline void zread_infiot_egress(ZAPI_HANDLER_ARGS)
 	s = msg;
 	STREAM_GETL(s, size);
 	STREAM_GETL(s, dest);
-	struct infiot_egress_hook* update = NULL;
-	update = (struct infiot_egress_hook*)malloc(sizeof(struct infiot_egress_hook));
-	if(!update) {
-		zlog_warn("Malloc failed");
-		return;
-	}
-	update->dest = dest;
-	update->size = size;
+	struct infiot_egress_hook update;
+	memset(&update, 0, sizeof(update));
+	update.dest = dest;
+	update.size = size;
 	for(int i=0;i<size;i++) {
-		STREAM_GETL(s, update->nexthop[i]);
+		STREAM_GETL(s, update.nexthop[i]);
 	}
 	for(int i=0;i<size;i++) {
-		STREAM_GETW(s, update->cost[i]);
+		STREAM_GETW(s, update.cost[i]);
 	}
-	//Added a hook call to the FPM library to send the information
-	//to the dataplane via FPM
-	hook_call(egress_update, update,NULL);
+	hook_call(egress_update, &update, NULL);
 stream_failure:
 	return;
 }
