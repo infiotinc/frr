@@ -421,8 +421,8 @@ static int infnh_readcfg(void)
 	}
 
 error:
-	if (jsondata) {
-		json_object_put(jsondata);
+	if (jsondatafull) {
+		json_object_put(jsondatafull);
 	}
 	if (rawdata) {
 		free(rawdata);
