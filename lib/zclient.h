@@ -250,8 +250,6 @@ typedef enum {
 	ZEBRA_TC_CLASS_DELETE,
 	ZEBRA_TC_FILTER_ADD,
 	ZEBRA_TC_FILTER_DELETE,
-	ZEBRA_INFIOT_EGRESS_ADD,
-	ZEBRA_INFIOT_EGRESS_DELETE
 } zebra_message_types_t;
 
 enum zebra_error_types {

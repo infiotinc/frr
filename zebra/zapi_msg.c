@@ -67,8 +67,6 @@
 DEFINE_MTYPE_STATIC(ZEBRA, RE_OPAQUE, "Route Opaque Data");
 
 static int zapi_nhg_decode(struct stream *s, int cmd, struct zapi_nhg *api_nhg);
-DEFINE_HOOK(egress_update, (struct infiot_egress_hook * rn, const char *reason),
-		(rn, reason));
 
 /* Encoding helpers -------------------------------------------------------- */
 
@@ -3554,36 +3552,6 @@ stream_failure:
 	return;
 }
 
-//update from BGP regarding the egress tracking
-static inline void zread_infiot_egress(ZAPI_HANDLER_ARGS)
-{
-	uint32_t size = 0;
-	uint32_t dest= 0;
-	struct stream *s;
-	s = msg;
-	STREAM_GETL(s, size);
-	STREAM_GETL(s, dest);
-	struct infiot_egress_hook* update = NULL;
-	update = (struct infiot_egress_hook*)malloc(sizeof(struct infiot_egress_hook));
-	if(!update) {
-		zlog_warn("Malloc failed");
-		return;
-	}
-	update->dest = dest;
-	update->size = size;
-	for(int i=0;i<size;i++) {
-		STREAM_GETL(s, update->nexthop[i]);
-	}
-	for(int i=0;i<size;i++) {
-		STREAM_GETW(s, update->cost[i]);
-	}
-	//Added a hook call to the FPM library to send the information
-	//to the dataplane via FPM
-	hook_call(egress_update, update,NULL);
-stream_failure:
-	return;
-}
-
 static inline void zebra_neigh_register(ZAPI_HANDLER_ARGS)
 {
 	afi_t afi;
@@ -3979,8 +3947,6 @@ void (*const zserv_handlers[])(ZAPI_HANDLER_ARGS) = {
 	[ZEBRA_TC_CLASS_DELETE] = zread_tc_class,
 	[ZEBRA_TC_FILTER_ADD] = zread_tc_filter,
 	[ZEBRA_TC_FILTER_DELETE] = zread_tc_filter,
-	[ZEBRA_INFIOT_EGRESS_ADD] = zread_infiot_egress,
-	[ZEBRA_INFIOT_EGRESS_DELETE] = zread_infiot_egress,
 };
 
 /*
