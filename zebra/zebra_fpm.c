@@ -1226,7 +1226,7 @@ static inline int zfpm_is_enabled(void)
  *
  * Returns TRUE if the connection to the FPM is up.
  */
-inline int zfpm_conn_is_up(void)
+static inline int zfpm_conn_is_up(void)
 {
 	if (zfpm_g->state != ZFPM_STATE_ESTABLISHED)
 		return 0;
