@@ -2672,7 +2672,17 @@ int bgp_maximum_prefix_overflow(struct peer *peer, afi_t afi, safi_t safi,
 void bgp_rib_remove(struct bgp_node *rn, struct bgp_info *ri, struct peer *peer,
 		    afi_t afi, safi_t safi)
 {
-	bgp_aggregate_decrement(peer->bgp, &rn->p, ri, afi, safi);
+	/*
+	 * When dampening is in effect, bgp_rib_withdraw() already decremented
+	 * the aggregate for this route before bgp_damp_withdraw() marked it
+	 * BGP_INFO_HISTORY. Decrementing again here would be a no-op against
+	 * a route that is no longer counted (masked by the BGP_INFO_HOLDDOWN
+	 * check inside bgp_aggregate_decrement()) in the "used" case, but if
+	 * it were ever re-ordered it could silently double-decrement instead
+	 * - so skip it explicitly rather than relying on that side effect.
+	 */
+	if (!CHECK_FLAG(ri->flags, BGP_INFO_HISTORY))
+		bgp_aggregate_decrement(peer->bgp, &rn->p, ri, afi, safi);
 
 	if (!CHECK_FLAG(ri->flags, BGP_INFO_HISTORY))
 		bgp_info_delete(rn, ri); /* keep historical info */
@@ -2686,15 +2696,22 @@ static void bgp_rib_withdraw(struct bgp_node *rn, struct bgp_info *ri,
 {
 	/* apply dampening, if result is suppressed, we'll be retaining
 	 * the bgp_info in the RIB for historical reference.
+	 *
+	 * Decrement the aggregate count before calling bgp_damp_withdraw():
+	 * that call unconditionally marks the route BGP_INFO_HISTORY (part
+	 * of BGP_INFO_HOLDDOWN) regardless of whether it ends up suppressed,
+	 * and bgp_aggregate_decrement() skips routes that are already in
+	 * holddown. Decrementing afterwards would silently fail to remove
+	 * this route's contribution to the aggregate, leaving aggregate->count
+	 * permanently too high.
 	 */
 	if (CHECK_FLAG(peer->bgp->af_flags[afi][safi], BGP_CONFIG_DAMPENING)
-	    && peer->sort == BGP_PEER_EBGP)
+	    && peer->sort == BGP_PEER_EBGP) {
+		bgp_aggregate_decrement(peer->bgp, &rn->p, ri, afi, safi);
 		if ((bgp_damp_withdraw(ri, rn, afi, safi, 0))
-		    == BGP_DAMP_SUPPRESSED) {
-			bgp_aggregate_decrement(peer->bgp, &rn->p, ri, afi,
-						safi);
+		    == BGP_DAMP_SUPPRESSED)
 			return;
-		}
+	}
 
 #if ENABLE_BGP_VNC
 	if (safi == SAFI_MPLS_VPN) {
@@ -5554,6 +5571,67 @@ static void bgp_aggregate_install(struct bgp *bgp, afi_t afi, safi_t safi,
 	bgp_unlock_node(rn);
 }
 
+/*
+ * aggregate->count is maintained incrementally: bgp_aggregate_increment()/
+ * bgp_aggregate_decrement() only ever apply a +1/-1 delta for the single
+ * route that triggered them, on top of whatever value the counter already
+ * holds. If any earlier event ever applied an unbalanced delta (a missed or
+ * duplicated increment/decrement, e.g. due to a route transitioning through
+ * BGP_INFO_HOLDDOWN at the wrong point in a withdraw/dampening/nexthop-
+ * tracking sequence), the drift is never corrected by later events, since
+ * those only ever nudge the counter by +/-1 relative to its current value.
+ * The counter can therefore go to 0 - withdrawing the locally-generated
+ * aggregate - even though more-specific contributing routes are still
+ * present and valid, and the aggregate then stays missing indefinitely
+ * (until the aggregate-address config is removed and reapplied, which
+ * rebuilds the counter from a fresh struct via a full walk).
+ *
+ * As a safety net, whenever a recompute is about to conclude that there are
+ * no more contributing routes, verify that against the real RIB contents
+ * and resync the counter if it disagrees, rather than silently withdrawing
+ * an aggregate that should still be announced.
+ */
+static unsigned long bgp_aggregate_count_contributors(struct bgp *bgp,
+						      struct prefix *p,
+						      afi_t afi, safi_t safi,
+						      struct bgp_info *rinew,
+						      struct bgp_info *del)
+{
+	struct bgp_table *table;
+	struct bgp_node *top;
+	struct bgp_node *rn;
+	struct bgp_info *ri;
+	unsigned long count = 0;
+
+	table = bgp->rib[afi][safi];
+
+	top = bgp_node_get(table, p);
+	for (rn = bgp_node_get(table, p); rn;
+	     rn = bgp_route_next_until(rn, top)) {
+		if (rn->p.prefixlen <= p->prefixlen)
+			continue;
+
+		for (ri = rn->info; ri; ri = ri->next) {
+			if (BGP_INFO_HOLDDOWN(ri))
+				continue;
+
+			if (del && ri == del)
+				continue;
+
+			if (ri->sub_type == BGP_ROUTE_AGGREGATE)
+				continue;
+
+			count++;
+		}
+	}
+	bgp_unlock_node(top);
+
+	if (rinew)
+		count++;
+
+	return count;
+}
+
 /* Update an aggregate as routes are added/removed from the BGP table */
 static void bgp_aggregate_route(struct bgp *bgp, struct prefix *p,
 				struct bgp_info *rinew, afi_t afi, safi_t safi,
@@ -5693,6 +5771,21 @@ static void bgp_aggregate_route(struct bgp *bgp, struct prefix *p,
 					community = community_dup(
 						rinew->attr->community);
 			}
+		}
+	}
+
+	if (aggregate->count == 0) {
+		unsigned long real_count = bgp_aggregate_count_contributors(
+			bgp, p, afi, safi, rinew, del);
+
+		if (real_count != aggregate->count) {
+			char buf[PREFIX_STRLEN];
+
+			prefix2str(p, buf, sizeof(buf));
+			zlog_warn(
+				"aggregate-address %s: count drift detected (tracked %lu, actual %lu), resyncing",
+				buf, aggregate->count, real_count);
+			aggregate->count = real_count;
 		}
 	}
 
