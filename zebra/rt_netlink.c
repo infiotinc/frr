@@ -2927,14 +2927,15 @@ netlink_put_route_update_msg(struct nl_batch *bth, struct zebra_dplane_ctx *ctx)
 	int cmd;
 	const struct prefix *p = dplane_ctx_get_dest(ctx);
 
-	zlog_debug("kernel_route_rib: skip netlink %u", g_rtnetlink_skip_install);
 	if (g_rtnetlink_skip_install) {
-		char buf[SRCDEST2STR_BUFFER + 1];
-		if (p) {
-			prefix2str(p, buf, SRCDEST2STR_BUFFER);
-			zlog_debug("kernel_route_rib: skip install/remove route p=%s to kernel", buf);
+		if (IS_ZEBRA_DEBUG_KERNEL) {
+			char buf[SRCDEST2STR_BUFFER + 1];
+			if (p) {
+				prefix2str(p, buf, SRCDEST2STR_BUFFER);
+				zlog_debug("kernel_route_rib: skip install/remove route p=%s to kernel", buf);
+			}
+			zlog_debug("kernel_route_rib: skip install/remove route to kernel");
 		}
-		zlog_debug("kernel_route_rib: skip install/remove route to kernel");
 		return FRR_NETLINK_SUCCESS;
 	}
 
