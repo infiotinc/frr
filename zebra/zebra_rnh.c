@@ -709,7 +709,9 @@ zebra_rnh_resolve_nexthop_entry(vrf_id_t vrfid, int family,
 				if (isreachable) {
 					break;
 				}else if (prefix_match(&g_infovlay_prefix, &rn->p)){
-					zlog_debug("overlay supernet prefix node, so look for next re entry");
+					if (IS_ZEBRA_DEBUG_NHT) {
+						zlog_debug("overlay supernet prefix node, so look for next re entry");
+					}
 					continue;
 				}
 			} else {

@@ -1857,18 +1857,19 @@ enum dp_req_result kernel_route_rib(struct route_node *rn,
 {
 	int ret = 0;
 
-	zlog_debug("kernel_route_rib: skip netlink %u", g_rtnetlink_skip_install);
 	if (g_rtnetlink_skip_install) {
-		char buf[SRCDEST2STR_BUFFER + 1];
-		if (p) {
-			prefix2str(p, buf, SRCDEST2STR_BUFFER);
-			zlog_debug("kernel_route_rib: skip install/remove route p=%s to kernel", buf);
+		if (IS_ZEBRA_DEBUG_KERNEL) {
+			char buf[SRCDEST2STR_BUFFER + 1];
+			if (p) {
+				prefix2str(p, buf, SRCDEST2STR_BUFFER);
+				zlog_debug("kernel_route_rib: skip install/remove route p=%s to kernel", buf);
+			}
+			if (src_p) {
+				prefix2str(p, buf, SRCDEST2STR_BUFFER);
+				zlog_debug("kernel_route_rib: skip install/remove route src_p=%s to kernel", buf);
+			}
+			zlog_debug("kernel_route_rib: skip install/remove route to kernel");
 		}
-		if (src_p) {
-			prefix2str(p, buf, SRCDEST2STR_BUFFER);
-			zlog_debug("kernel_route_rib: skip install/remove route src_p=%s to kernel", buf);
-		}
-		zlog_debug("kernel_route_rib: skip install/remove route to kernel");
 		if (new) {
 			kernel_route_rib_pass_fail(rn, p, new, DP_INSTALL_SUCCESS);
 		}
