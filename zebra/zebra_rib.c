@@ -854,13 +854,15 @@ void zebra_rib_evaluate_rn_nexthops(struct route_node *rn, uint32_t seq,
 		if (IS_ZEBRA_DEBUG_NHT_DETAILED)
 			zlog_debug(
 				"%s: overlay_relevant is set for %pRN", __func__, rn);
-		if (++g_overlay_trkr_eval_seq == 0) {//wrapcase
-			g_overlay_trkr_eval_seq = 1;  // Skip 0, go to 1 instead
-		}
 		struct rib_table_info *info = srcdest_rnode_table_info(trigger_rn);
 		struct zebra_vrf *zvrf = info ? info->zvrf : NULL;
 		if (zvrf && info) {
-			zebra_rnh_evaluate_overlay_prefixes(zvrf, info->afi, 0, &trigger_rn->p, info->safi);
+			/* Coalesce this with any other overlay-relevant events
+			 * arriving in the same short window rather than
+			 * walking the whole RNH table synchronously here; see
+			 * zebra_rnh_schedule_overlay_prefixes_eval().
+			 */
+			zebra_rnh_schedule_overlay_prefixes_eval(zvrf, info->afi, info->safi);
 		}
 	}
 

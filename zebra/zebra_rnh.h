@@ -48,6 +48,11 @@ extern void zebra_evaluate_rnh(struct zebra_vrf *zvrf, afi_t afi, int force,
 #ifdef ZEBRA_INFIOT_CUSTOM_NEXTHOP_CHECK
 extern void zebra_rnh_evaluate_overlay_prefixes(struct zebra_vrf *zvrf, afi_t afi,
             int force, const struct prefix *skip_p, safi_t safi);
+/* Debounced entry point: coalesces a burst of overlay-relevant route events
+ * for the same (vrf, afi, safi) into a single deferred table walk. Use this
+ * instead of zebra_rnh_evaluate_overlay_prefixes() from route-event paths. */
+extern void zebra_rnh_schedule_overlay_prefixes_eval(struct zebra_vrf *zvrf,
+						      afi_t afi, safi_t safi);
 /* Epoch counter shared with zebra_rib.c for per-RNH SHM result caching. */
 extern uint32_t g_overlay_trkr_eval_seq;
 #endif
