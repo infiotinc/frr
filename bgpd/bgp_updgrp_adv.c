@@ -888,6 +888,19 @@ void subgroup_default_originate(struct update_subgroup *subgrp, int withdraw)
 			     pi = pi->next) {
 				struct attr tmp_attr = attr;
 
+				/* BWAN-20311: Only a usable path may satisfy
+				 * the default-originate route-map. A path whose
+				 * nexthop is unreachable (invalid), or which is
+				 * history/damped/removed, is retained in the
+				 * BGP table until the peer withdraws it (e.g.
+				 * hold timer expiry) but is not a live route.
+				 * Matching on it keeps the default route
+				 * advertised after the condition route is lost,
+				 * so traffic is black-holed with no failover.
+				 */
+				if (BGP_PATH_HOLDDOWN(pi))
+					continue;
+
 				tmp_pi.attr = &tmp_attr;
 
 				new_ret = route_map_apply_ext(

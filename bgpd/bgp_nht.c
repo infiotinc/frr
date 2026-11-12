@@ -1314,6 +1314,11 @@ void evaluate_paths(struct bgp_nexthop_cache *bnc)
 					bgp_evpn_import_route(bgp_path,
 						afi, safi, bgp_dest_get_prefix(dest), path);
 			}
+
+			/* BWAN-20311: a path became (in)valid; a default-originate
+			 * route-map that matches it may change outcome even if the
+			 * bestpath does not change. */
+			bgp_default_originate_eval_schedule(bgp_path);
 		}
 
 		bgp_process(bgp_path, dest, afi, safi);
