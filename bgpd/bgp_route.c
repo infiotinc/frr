@@ -3088,6 +3088,27 @@ static bool bgp_lu_need_imp_null(const struct bgp_path_info *new_select)
  *     We have no eligible route that we can announce or the rn
  *     is being removed.
  */
+/*
+ * Arm the (debounced) re-evaluation of every "neighbor X default-originate
+ * route-map Y" in this bgp instance. The evaluation itself is cheap and only
+ * touches update groups that have a default-originate route-map configured.
+ *
+ * It must run whenever something that can change the route-map's outcome
+ * changed: a bestpath change, and also a path becoming valid/invalid (e.g. its
+ * nexthop turned inaccessible) when that does not change the bestpath.
+ */
+void bgp_default_originate_eval_schedule(struct bgp *bgp)
+{
+	if (bgp->t_rmap_def_originate_eval)
+		return;
+
+	bgp_lock(bgp);
+	thread_add_timer(bm->master,
+			 update_group_refresh_default_originate_route_map, bgp,
+			 RMAP_DEFAULT_ORIGINATE_EVAL_TIMER,
+			 &bgp->t_rmap_def_originate_eval);
+}
+
 static void bgp_process_main_one(struct bgp *bgp, struct bgp_dest *dest,
 				 afi_t afi, safi_t safi)
 {
@@ -3263,14 +3284,7 @@ static void bgp_process_main_one(struct bgp *bgp, struct bgp_dest *dest,
 	if (old_select || new_select) {
 		bgp_bump_version(dest);
 
-		if (!bgp->t_rmap_def_originate_eval) {
-			bgp_lock(bgp);
-			thread_add_timer(
-				bm->master,
-				update_group_refresh_default_originate_route_map,
-				bgp, RMAP_DEFAULT_ORIGINATE_EVAL_TIMER,
-				&bgp->t_rmap_def_originate_eval);
-		}
+		bgp_default_originate_eval_schedule(bgp);
 	}
 
 	if (old_select)
