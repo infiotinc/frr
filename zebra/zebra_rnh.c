@@ -70,7 +70,6 @@ DEFINE_HOOK(evaluate_custom_nexthop, (struct prefix *pp, uint8_t *isreachable, s
 		(pp, isreachable, rnh));
 extern struct in_addr g_infovlay_ipv4;
 extern struct trkr_client *g_infovlay_trkr;
-int g_inf_nhcntr_read_success = 0;
 extern int g_inf_is_controller;
 extern struct list *g_inf_ctrl_overlay_ips;
 /* Epoch counter: incremented once per overlay/127.127.127.127/32 route-change event in
@@ -507,14 +506,78 @@ static void zebra_rnh_notify_protocol_clients(struct zebra_vrf *zvrf, afi_t afi,
 #ifdef ZEBRA_INFIOT_CUSTOM_NEXTHOP_CHECK
 #include "tracker_api.h"
 
-static void recreate_tracker_client(void) {
-	/* trkr should not be NULL, certainly a race condition where
-	 * data is inconsistent between tracker client and manager.
-	 * Recreating fixes it.
-	 */
-	zlog_debug("Infiot: recreating tracker client");
-	trkr_client_delete(g_infovlay_trkr);
-	g_infovlay_trkr = NULL;
+#define INFIOT_TRKR_POLL_SEC 5
+/* zebra runs one event loop; do not wait long for Click's init semaphore */
+#define INFIOT_TRKR_SEM_WAIT_MS 100
+
+static struct thread *t_infiot_trkr_poll;
+static uint32_t infiot_trkr_rev;
+
+/* Re-evaluate every overlay nexthop against the current tracker state. */
+static void infiot_trkr_reevaluate_overlay(void)
+{
+	struct vrf *vrf;
+	struct zebra_vrf *zvrf;
+
+	if (++g_overlay_trkr_eval_seq == 0)
+		g_overlay_trkr_eval_seq = 1;
+
+	RB_FOREACH (vrf, vrf_name_head, &vrfs_by_name) {
+		zvrf = vrf->info;
+		if (zvrf)
+			zebra_rnh_evaluate_overlay_prefixes(zvrf, AFI_IP, 0, NULL,
+							    SAFI_UNICAST);
+	}
+}
+
+/*
+ * Attach to Click's tracker memory and keep the attachment valid. The nexthop
+ * check never creates or destroys the client, so a missing or restarting Click
+ * costs one NULL test per evaluation. Click starting after zebra, restarting in
+ * place, or being replaced is picked up here within INFIOT_TRKR_POLL_SEC and
+ * followed by a re-evaluation of all overlay nexthops. A change in the set of
+ * trackers (a peer coming up or going down) is picked up the same way, without
+ * depending on Click's 127.127.127.127 route toggle.
+ */
+static void infiot_trkr_poll(struct thread *t)
+{
+	bool changed = false;
+
+	if (g_infovlay_trkr && trkr_client_is_stale(g_infovlay_trkr)) {
+		zlog_info("Infiot: click tracker memory was replaced, detaching");
+		trkr_client_delete(g_infovlay_trkr);
+		g_infovlay_trkr = NULL;
+		changed = true;
+	}
+
+	if (!g_infovlay_trkr) {
+		if (!trkr_client_create_timeout("click.tr", &g_infovlay_trkr,
+						INFIOT_TRKR_SEM_WAIT_MS)
+		    && g_infovlay_trkr) {
+			zlog_info("Infiot: attached to click tracker memory");
+			infiot_trkr_rev = trkr_client_revision(g_infovlay_trkr);
+			changed = true;
+		}
+	} else {
+		uint32_t rev = trkr_client_revision(g_infovlay_trkr);
+
+		if (rev != infiot_trkr_rev) {
+			infiot_trkr_rev = rev;
+			changed = true;
+		}
+	}
+
+	if (changed)
+		infiot_trkr_reevaluate_overlay();
+
+	thread_add_timer(zrouter.master, infiot_trkr_poll, NULL,
+			 INFIOT_TRKR_POLL_SEC, &t_infiot_trkr_poll);
+}
+
+void infiot_trkr_poll_start(void)
+{
+	thread_add_timer(zrouter.master, infiot_trkr_poll, NULL, 0,
+			 &t_infiot_trkr_poll);
 }
 
 static int check_overlay_nexthop(struct prefix *pp, uint8_t *isreachable, struct rnh *rnh)
@@ -586,15 +649,12 @@ static int check_overlay_nexthop(struct prefix *pp, uint8_t *isreachable, struct
 		return *isreachable;
 	}
 
-	// It is possible that when zebra starts, click has not created the
-	// SHM in which case the client initialization will fail in infnh_init.
-	// retry here
+	/* The tracker client is attached and kept valid by infiot_trkr_poll();
+	 * it is never created or destroyed here. While Click's tracker memory is
+	 * not available the nexthop is unreachable. That result is not cached, so
+	 * the nexthop is evaluated again once the client attaches. */
 	if (g_infovlay_trkr == NULL) {
-		trkr_client_create("click.tr", &g_infovlay_trkr);
-		if (g_infovlay_trkr == NULL) {
-			zlog_debug("infiot overlay trkr null reachable %d", *isreachable);
-			return *isreachable;
-		}
+		return *isreachable;
 	}
 
 	inet_ntop(AF_INET, &g_infovlay_ipv4, selfip, PREFIX2STR_BUFFER);
@@ -617,23 +677,14 @@ static int check_overlay_nexthop(struct prefix *pp, uint8_t *isreachable, struct
 	snprintf(cntrname, 256, "nh.%s", via);
 	const trkr_t *trkr = trkr_client_get_trkr_by_index(g_infovlay_trkr, cntrname, 0, 1, &rnh->nh_trkr_index);
 
-	if (trkr) {
-		g_inf_nhcntr_read_success = 1;
-	}
+	/* nh.<dest> names the first hop. When it is absent (for example before
+	 * Click has applied a snapshot) the destination itself is checked. */
 	if ( trkr && trkr->val > 0 ) {
 		inet_ntop(pp->family, &trkr->val, via, PREFIX2STR_BUFFER);
-		snprintf(cntrname, 256, "overlay.%s", via);
 	} else {
-		if (trkr == NULL && !g_inf_nhcntr_read_success) {
-			/* Even if one nh cntr is read successfully from SHM, there is no attempt
-			 * to recreate tracker client
-			 */
-			recreate_tracker_client();
-			return *isreachable;
-		}
 		inet_ntop(pp->family, &pp->u.prefix, via, PREFIX2STR_BUFFER);
-		snprintf(cntrname, 256, "overlay.%s", via);
 	}
+	snprintf(cntrname, 256, "overlay.%s", via);
 
 	trkr = trkr_client_get_trkr_by_index(g_infovlay_trkr, cntrname, 0, 1, &rnh->dest_trkr_index);
 	if ( trkr && trkr->val > 0 ) {

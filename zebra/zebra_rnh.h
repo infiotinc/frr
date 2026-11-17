@@ -50,6 +50,8 @@ extern void zebra_rnh_evaluate_overlay_prefixes(struct zebra_vrf *zvrf, afi_t af
             int force, const struct prefix *skip_p, safi_t safi);
 /* Epoch counter shared with zebra_rib.c for per-RNH SHM result caching. */
 extern uint32_t g_overlay_trkr_eval_seq;
+/* Start the timer that attaches to and revalidates Click's tracker memory. */
+extern void infiot_trkr_poll_start(void);
 #endif
 extern void zebra_print_rnh_table(vrf_id_t vrfid, afi_t afi, safi_t safi,
 				  struct vty *vty, const struct prefix *p,
