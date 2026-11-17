@@ -444,7 +444,7 @@ void infnh_init(void)
 	}
 
 	g_infovlay_trkr = NULL;
-	trkr_client_create("click.tr", &g_infovlay_trkr);
+	infiot_trkr_poll_start();
 	return;
 }
 #endif
