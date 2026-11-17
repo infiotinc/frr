@@ -910,6 +910,9 @@ void zebra_import_table_rm_update(const char *rmap)
 		if (!zvrf)
 			continue;
 
+		if (!vrf_is_enabled(vrf))
+			continue;
+
 		zebra_import_table_rm_update_vrf(zvrf, rmap);
 	}
 }
