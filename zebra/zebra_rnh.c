@@ -511,7 +511,6 @@ static void zebra_rnh_notify_protocol_clients(struct zebra_vrf *zvrf, afi_t afi,
 #define INFIOT_TRKR_SEM_WAIT_MS 100
 
 static struct thread *t_infiot_trkr_poll;
-static uint32_t infiot_trkr_rev;
 
 /* Re-evaluate every overlay nexthop against the current tracker state. */
 static void infiot_trkr_reevaluate_overlay(void)
@@ -531,44 +530,20 @@ static void infiot_trkr_reevaluate_overlay(void)
 }
 
 /*
- * Attach to Click's tracker memory and keep the attachment valid. The nexthop
- * check never creates or destroys the client, so a missing or restarting Click
- * costs one NULL test per evaluation. Click starting after zebra, restarting in
- * place, or being replaced is picked up here within INFIOT_TRKR_POLL_SEC and
- * followed by a re-evaluation of all overlay nexthops. A change in the set of
- * trackers (a peer coming up or going down) is picked up the same way, without
- * depending on Click's 127.127.127.127 route toggle.
+ * Attach to Click's tracker memory, retrying until it exists (Click may start
+ * after zebra). Polling stops after the first successful attach and the
+ * overlay nexthops are re-evaluated once. The attachment stays valid when
+ * Click restarts in place; it is not followed if Click replaces the segment.
  */
 static void infiot_trkr_poll(struct thread *t)
 {
-	bool changed = false;
-
-	if (g_infovlay_trkr && trkr_client_is_stale(g_infovlay_trkr)) {
-		zlog_info("Infiot: click tracker memory was replaced, detaching");
-		trkr_client_delete(g_infovlay_trkr);
-		g_infovlay_trkr = NULL;
-		changed = true;
-	}
-
-	if (!g_infovlay_trkr) {
-		if (!trkr_client_create_timeout("click.tr", &g_infovlay_trkr,
-						INFIOT_TRKR_SEM_WAIT_MS)
-		    && g_infovlay_trkr) {
-			zlog_info("Infiot: attached to click tracker memory");
-			infiot_trkr_rev = trkr_client_revision(g_infovlay_trkr);
-			changed = true;
-		}
-	} else {
-		uint32_t rev = trkr_client_revision(g_infovlay_trkr);
-
-		if (rev != infiot_trkr_rev) {
-			infiot_trkr_rev = rev;
-			changed = true;
-		}
-	}
-
-	if (changed)
+	if (!trkr_client_create_timeout("click.tr", &g_infovlay_trkr,
+					INFIOT_TRKR_SEM_WAIT_MS)
+	    && g_infovlay_trkr) {
+		zlog_info("Infiot: attached to click tracker memory");
 		infiot_trkr_reevaluate_overlay();
+		return;
+	}
 
 	thread_add_timer(zrouter.master, infiot_trkr_poll, NULL,
 			 INFIOT_TRKR_POLL_SEC, &t_infiot_trkr_poll);
