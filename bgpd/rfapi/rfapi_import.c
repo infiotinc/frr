@@ -2795,7 +2795,7 @@ rfapiBiStartWithdrawTimer(struct rfapi_import_table *import_table,
 	assert(bpi->extra);
 	if (lifetime > UINT32_MAX / 1001) {
 		/* sub-optimal case, but will probably never happen */
-		bpi->extra->vnc.import.timer = NULL;
+		thread_cancel(&bpi->extra->vnc.import.timer);
 		thread_add_timer(bm->master, timer_service_func, wcb, lifetime,
 				 &bpi->extra->vnc.import.timer);
 	} else {
@@ -2811,7 +2811,7 @@ rfapiBiStartWithdrawTimer(struct rfapi_import_table *import_table,
 
 		lifetime_msec = (lifetime * 1000) + jitter;
 
-		bpi->extra->vnc.import.timer = NULL;
+		thread_cancel(&bpi->extra->vnc.import.timer);
 		thread_add_timer_msec(bm->master, timer_service_func, wcb,
 				      lifetime_msec,
 				      &bpi->extra->vnc.import.timer);
