@@ -5481,6 +5481,11 @@ static int bgp_aggregate_info_same(struct bgp_info *ri, uint8_t origin,
 	if (!community_cmp(ri->attr->community, comm))
 		return 0;
 
+	/* A withdrawn (REMOVED) aggregate that has not been reaped yet
+	 * must not be treated as the currently installed aggregate. */
+	if (!CHECK_FLAG(ri->flags, BGP_INFO_VALID))
+		return 0;
+
 	return 1;
 }
 
@@ -5508,9 +5513,16 @@ static void bgp_aggregate_install(struct bgp *bgp, afi_t afi, safi_t safi,
 		/*
 		 * If the aggregate information has not changed
 		 * no need to re-install it again.
+		 *
+		 * Compare against the locally generated aggregate path
+		 * ('ri', NULL if none exists) and NOT against rn->info.
+		 * rn->info is the head of the path list, which can be a
+		 * non-aggregate path for the very same prefix (e.g. the
+		 * prefix learned via iBGP with an empty AS path/IGP origin).
+		 * Comparing against that path made the aggregate look
+		 * "unchanged" and it was never generated.
 		 */
-		if (bgp_aggregate_info_same(rn->info, origin, aspath,
-					    community)) {
+		if (bgp_aggregate_info_same(ri, origin, aspath, community)) {
 			bgp_unlock_node(rn);
 
 			if (aspath)
